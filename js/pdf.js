@@ -132,10 +132,31 @@ const HTAT_PDF = (() => {
     return { w: w * r, h: h * r };
   }
 
+  /* Carga diferida de jsPDF: solo se descarga al primer PDF (botón
+     "Descargar PDF" / "Mostrar PDF"), nunca al abrir la app. Evita
+     traducir ~120 KB (jspdf) en cada carga inicial del sitio. */
+  let _jspdfPromise = null;
+  function jsPDFAsync() {
+    if (_jspdfPromise) return _jspdfPromise;
+    _jspdfPromise = new Promise((resolve, reject) => {
+      const JsPDF = (typeof window !== "undefined" && window.jspdf && window.jspdf.jsPDF) ||
+                    (typeof jsPDF !== "undefined" ? jsPDF : null);
+      if (JsPDF) { resolve(JsPDF); return; }
+      if (typeof document === "undefined") { reject(new Error("Sin DOM para cargar jsPDF.")); return; }
+      const s = document.createElement("script");
+      s.src = "lib/jspdf.umd.min.js";
+      s.onload = () => {
+        const J2 = (window && window.jspdf && window.jspdf.jsPDF) || (typeof jsPDF !== "undefined" ? jsPDF : null);
+        if (J2) resolve(J2); else reject(new Error("jsPDF no quedó disponible tras cargar."));
+      };
+      s.onerror = (e) => { _jspdfPromise = null; reject(new Error("No se pudo cargar jsPDF.")); };
+      (document.head || document.body).appendChild(s);
+    });
+    return _jspdfPromise;
+  }
+
   async function build(record) {
-    const JsPDF = (typeof window !== "undefined" && window.jspdf && window.jspdf.jsPDF) ||
-                  (typeof jsPDF !== "undefined" ? jsPDF : null);
-    if (!JsPDF) throw new Error("La librería jsPDF no se cargó correctamente.");
+    const JsPDF = await jsPDFAsync();
     const doc = new JsPDF({ unit: "mm", format: "a4", compress: true });
     doc.setLineCap("round");
     doc.setLineJoin("round");
