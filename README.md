@@ -36,4 +36,4 @@ assets/             Íconos
 
 ## Seguridad
 
-El acceso al historial compartido está protegido con **Cloudflare Access** (ver `SEGURIDAD-PLAN.md`): solo el personal autorizado puede leer o escribir OTs.
+El historial compartido no usa login: la API responde a quien conozca la URL (ver `SEGURIDAD-PLAN.md`). No compartir la URL fuera del personal.

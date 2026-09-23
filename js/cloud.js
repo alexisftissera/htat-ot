@@ -99,7 +99,6 @@ const Cloud = (() => {
     try {
       const res = await fetch(CONF.cloud.webAppUrl, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(carga),
       });
@@ -125,7 +124,6 @@ const Cloud = (() => {
     try {
       const res = await fetch(CONF.cloud.webAppUrl, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action: "delete", id }),
       });
@@ -150,7 +148,7 @@ const Cloud = (() => {
       return { ok: false, msg: "Ingresá la URL de la base compartida y guardá primero." };
     }
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store", credentials: "include" });
+      const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store" });
       const txt = await res.text();
       let n = -1;
       try {
@@ -173,7 +171,7 @@ const Cloud = (() => {
   async function lineas(force) {
     if (!isConfigured()) return lineasCache || [];
     if (!force && lineasCache) return lineasCache;
-    const res = await fetch(CONF.cloud.webAppUrl + "?lineas=1", { method: "GET", cache: "no-store", credentials: "include" });
+    const res = await fetch(CONF.cloud.webAppUrl + "?lineas=1", { method: "GET", cache: "no-store" });
     const arr = await res.json();
     lineasCache = Array.isArray(arr) ? arr : [];
     return lineasCache;
@@ -185,7 +183,6 @@ const Cloud = (() => {
     if (!isConfigured()) throw new Error("Sin conexión con la base");
     const res = await fetch(CONF.cloud.webAppUrl, {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "linea", nombre: n }),
     });
@@ -231,7 +228,7 @@ const Cloud = (() => {
   async function pullAll(force) {
     if (!isConfigured()) return [];
     if (!force && cache && Date.now() - cacheAt < TTL) return cache;
-    const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store", credentials: "include" });
+    const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store" });
     const rows = await res.json();
     cache = dedupeRows(Array.isArray(rows) ? rows : []);
     cacheAt = Date.now();
@@ -264,7 +261,6 @@ const Cloud = (() => {
       const res = await fetch(CONF.cloud.webAppUrl + "?img=" + encodeURIComponent(fileId), {
         method: "GET",
         cache: "no-store",
-        credentials: "include",
       });
       const data = await res.json();
       if (!data || !data.ok || !data.b64) return "";

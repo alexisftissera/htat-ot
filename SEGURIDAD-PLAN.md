@@ -1,6 +1,6 @@
 # 🔒 Plan de seguridad — Protona HTAT (Cloudflare Access)
 
-Estado: en preparación. **NO se borró ni modificó ninguna OT.**
+Estado: descartado (el taller decidió no usar Access). **NO se borró ni modificó ninguna OT.**
 
 ## Problema confirmado
 - `GET https://htat-api.htat.workers.dev/` devuelve el historial completo a cualquier persona, sin login.
