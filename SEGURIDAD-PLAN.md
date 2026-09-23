@@ -1,118 +1,85 @@
-# 🔒 Plan de seguridad — Protona HTAT (Cloudflare Access)
+# 🔒 Plan de seguridad — HTAT (login propio: usuario y contraseña)
 
-Estado: en preparación. **NO se borró ni modificó ninguna OT.**
+Estado: implementado y probado en local (13/13 pruebas OK). **NO se borró ni modificó ninguna OT.**
 
-## Problema confirmado
-- `GET https://htat-api.htat.workers.dev/` devuelve el historial completo a cualquier persona, sin login.
-- La API acepta `POST` (guardar/borrar) solo exigiendo un `id`, sin identificar quién es.
-- Fotos y firmas (`?img=`) también están sin protección.
+## Problema
+- `GET https://htat-api.htat.workers.dev/` devolvía el historial completo a cualquiera, sin login.
+- La API aceptaba `POST` (guardar/borrar) sin identificar quién era.
+- Fotos y firmas (`?img=`) sin protección.
+- El plan anterior (Cloudflare Access con email + código OTP) funcionaba pero resultaba tedioso: había que entrar por email/código cada 24 h y en dos dominios.
 
-## Solución elegida: Cloudflare Access (Zero Trust)
-Bloquea el acceso a nivel de red: solo entran los usuarios que autorices, con login (email/OTP/Google).
-
----
-
-## Paso 1 — Crear las aplicaciones Access (en el dashboard)
-
-1. Entrá a https://one.dash.cloudflare.com (o dash.cloudflare.com → **Zero Trust**).
-2. Si te lo pide, elegí el equipo: **HTAT**.
-3. Menú izquierdo → **Access → Applications → Add an application**.
-4. Elegí tipo **Self-hosted**.
-5. Creá **DOS aplicaciones**:
-
-### Aplicación 1: la API (datos) — la más importante
-| Campo | Valor |
-|---|---|
-| Application domain | `htat-api.htat.workers.dev` |
-| Session duration | 1 hora (o la que prefieras) |
-
-En **Policies → Add a policy**:
-| Campo | Valor |
-|---|---|
-| Policy name | `Solo personal autorizado` |
-| Action | **Allow** |
-| Include → Select... | **Emails** → agregá los correos del personal (Tissera Hector, Tissera Alexis, etc.) |
-
-### Aplicación 2: la app (opcional pero recomendado)
-| Campo | Valor |
-|---|---|
-| Application domain | `htat-ot.htat.workers.dev` |
-| Policy | Igual: solo emails autorizados |
-
-> 💡 En **Settings → Authentication** podés activar **"One-time PIN"**, para que cada persona
-> reciba un código por email y no necesite una cuenta de Google.
-> La primera vez la app pedirá login; después queda la sesión activa según la duración elegida.
+## Solución final: login propio en la D1
+- La app muestra una pantalla **usuario + contraseña**.
+- La **API exige un token** (`Authorization: Bearer ...`) en todas las operaciones de datos → el robo de datos queda bloqueado igual que con Access, pero sin OTP.
+- La contraseña se guarda **encriptada** (hash PBKDF2-SHA256, 120 000 iteraciones; nunca en texto plano).
+- La sesión dura **7 días** en el mismo navegador (se puede cambiar en `worker-htat-api-login.js`, constante `DIAS_SESION`).
+- Sin conexión la app sigue funcionando en modo local (el login solo se exige en línea).
 
 ---
 
-## Paso 2 — Actualizar la app (frontend) para usar la sesión
+## Pasos de despliegue
 
-En el Worker `htat-ot` (dashboard → Workers & Pages → htat-ot → Edit code),
-actualizá **`js/cloud.js`**: todas las llamadas `fetch(...)` deben llevar
-**`credentials: "include"`** para que el navegador envíe la cookie de sesión de Access.
+### Paso 1 — Worker de la API (`worker-htat-api-login.js`)
+1. Dashboard → **Workers & Pages → htat-api → Editar código**.
+2. Reemplazar TODO el contenido por el de **`htat-ot/worker-htat-api-login.js`**. *(Es el código con login; mantiene intactos los endpoints de datos y los bindings D1/R2.)*
+3. **Guardar / Implementar**.
+4. Verificar que siga con los bindings `DB` (D1) y `BUCKET` (R2).
 
-Ya dejé hecho este cambio en la copia local:
-`C:\Users\Alex\Documents\Default Project\htat-ot\js\cloud.js`
+### Paso 2 — Tablas nuevas en la D1 (no tocan `ots`)
+1. Dashboard → **Workers & Pages → D1 → `htat` → Consola**.
+2. Pegar el contenido de **`htat-ot/sql-crear-tablas-login.sql`** y ejecutar.
+3. Debe listar 3 tablas: `usuarios`, `sesiones`, `ots`.
 
-Ejemplo del cambio (una de las 7 llamadas):
+### Paso 3 — App (frontend) actualizada
+1. Dashboard → **Workers & Pages → htat-ot → Nueva implementación**.
+2. Arrastrar el ZIP **`htat-ot-app-v2.1.zip`** (o la carpeta `htat-ot-deploy/`) al área de subida.
+3. Confirmar el despliegue (implica: index.html, sw.js, js/auth.js nuevo, js/cloud.js, js/app.js, conf.js, styles.css).
+
+### Paso 4 — Crear el primer usuario (una sola vez)
+1. Abrir `https://htat-ot.htat.workers.dev/`.
+2. La pantalla de login detectará que **no hay usuarios** y ofrecerá **"Crear primer usuario"** (ese queda como administrador).
+3. Completar usuario + contraseña (mínimo 6 caracteres) + nombre opcional.
+
+### Paso 5 — Probar el flujo completo
+1. Cerrar sesión (Configuración → Cerrar sesión) y volver a entrar con usuario/contraseña.
+2. Abrir **Historial**: deben seguir apareciendo las **18 OTs**.
+3. Probar **Descargar PDF** y **Sincronizar ahora**.
+4. Desde la Configuración: entrado = "Historial compartido: conectado".
+
+### Paso 6 — Quitar Cloudflare Access (cuando todo funcione)
+- **Zero Trust → Access → Applications**: eliminar las dos aplicaciones
+  (`htat-api.htat.workers.dev` y `htat-ot.htat.workers.dev`).
+- Desde ese momento el acceso queda 100% a cargo del login propio (la app sigue bloqueando, y la API responde 401 sin token a cualquiera).
+
+---
+
+## Agregar más personal (después)
+Cada persona nueva necesita su propio usuario. Como administrador, ejecutar (desde la consola del navegador estando logueado en la app, o con un script):
+
 ```js
-// ANTES:
-const res = await fetch(CONF.cloud.webAppUrl, {
+// En la consola del navegador de la app (estando con sesión iniciada):
+fetch(CONF.cloud.webAppUrl, {
   method: "POST",
-  headers: { "Content-Type": "text/plain;charset=utf-8" },
-  body: JSON.stringify(carga),
-});
-// DESPUÉS:
-const res = await fetch(CONF.cloud.webAppUrl, {
-  method: "POST",
-  credentials: "include",          // ← agrega esta línea
-  headers: { "Content-Type": "text/plain;charset=utf-8" },
-  body: JSON.stringify(carga),
+  credentials: "include",
+  headers: { "Content-Type": "text/plain;charset=utf-8", Authorization: "Bearer " + Auth.token() },
+  body: JSON.stringify({ accion: "agregar-usuario", usuario: "hector", password: "claveSecreta", nombre: "Tissera Hector" }),
 });
 ```
 
----
-
-## Paso 3 — CORS con credenciales en `htat-api`
-
-Con Access activo, el navegador envía la sesión en las peticiones a `htat-api`.
-Para que el navegador **acepte leer la respuesta** (es un dominio distinto), el Worker
-de la API debe responder CORS permitiendo credenciales, **solo para el origen de la app**:
-
-```js
-// En el Worker htat-api, dentro del fetch handler (adaptar a la estructura actual):
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://htat-ot.htat.workers.dev",
-  "Access-Control-Allow-Credentials": "true",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-// Si llega una petición OPTIONS (preflight), responder 204 con esos headers.
-if (request.method === "OPTIONS") {
-  return new Response(null, { status: 204, headers: corsHeaders });
-}
-// Y en cada respuesta normal agregar los headers corsHeaders.
-```
-
-⚠️ **Importante:** para aplicar este paso con seguridad sobre tu código real,
-necesito ver el Worker `htat-api`. No lo modifiques a ciegas si no estás seguro
-de la estructura.
+> La contraseña viaja encriptada por HTTPS y se guarda hasheada. Idealmente cada persona elige la suya; se puede hacer un pequeño panel de "Usuarios" más adelante.
 
 ---
 
-## Paso 4 — Probar
+## Verificar que quedó protegido
+- `curl https://htat-api.htat.workers.dev/` (sin token) → **401** `{"ok":false,"error":"Sesión requerida..."}`.
+- `curl https://htat-api.htat.workers.dev/?estado=1` → `{"ok":true,"loginCreado":true}` (no revela datos).
+- Cualquier Origin distinto al de la app → **403**.
 
-1. Abrí `https://htat-ot.htat.workers.dev/` en un navegador (debería pedir login).
-2. Entrá con un correo autorizado (te llega un código por email si activaste OTP).
-3. Abrí el **Historial** y verificá que se sigan viendo las 18 OTs.
-4. Probá **Descargar PDF**.
-5. Para verificar que quedó bloqueado, en otra ventana/incógnito o con `curl`:
-   `curl https://htat-api.htat.workers.dev/` → debe devolver **401/403** (no los datos).
+## Notas de seguridad
+- Las contraseñas se guardan como hash PBKDF2 (nunca texto plano). El login incluye una pequeña espera fija para frenar fuerza bruta.
+- El token de sesión es aleatorio (32 bytes) y expira en 7 días; se borra al cerrar sesión o al expirar.
+- Recomendado a futuro: pantalla de "Cambiar contraseña" y bloqueo por varios intentos fallidos.
 
----
-
-## Quedan pendientes (opcional, recomendado)
-- Corregir el bug de **fotos 5 vs 9** (la app permite 9 fotos pero la nube guarda/lee solo 5).
-- Activar la **verificación de dos pasos** en las cuentas del personal autorizado.
-- Considerar **IP Access Rules** extra o **bot management** para capas adicionales.
+## Pendientes (sin relación con la seguridad)
+- Bug fotos **5 vs 9** (la app permite 9 fotos, la nube guarda/lee solo 5) — ver `cloud.js` `toRecord` y `guardar`.
+- Código muerto `Draft.save()` / `Draft.load()` en `store.js`.

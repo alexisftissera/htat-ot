@@ -15,6 +15,20 @@ const Cloud = (() => {
   let lastOk = 0;   // última vez que una operación con la base salió bien
   const TTL = 60000;
 
+  /* Autenticación: adjunta el token guardado (Auth) y, si el servidor
+     responde 401, muestra la pantalla de inicio de sesión. */
+  function authHeaders(extra) {
+    const h = Object.assign({}, extra || {});
+    const t = Auth.token();
+    if (t) h["Authorization"] = "Bearer " + t;
+    return h;
+  }
+  async function apiFetch(ruta, opciones) {
+    const res = await fetch(CONF.cloud.webAppUrl + (ruta || ""), opciones);
+    if (res.status === 401) Auth.expiro();
+    return res;
+  }
+
   function lastSync() { return lastOk; }
 
   function isConfigured() {
@@ -97,10 +111,10 @@ const Cloud = (() => {
     }
     let txt;
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, {
+      const res = await apiFetch("", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: authHeaders({ "Content-Type": "text/plain;charset=utf-8" }),
         body: JSON.stringify(carga),
       });
       txt = await res.text();
@@ -123,10 +137,10 @@ const Cloud = (() => {
     if (!isConfigured()) return false;
     let txt;
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, {
+      const res = await apiFetch("", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: authHeaders({ "Content-Type": "text/plain;charset=utf-8" }),
         body: JSON.stringify({ action: "delete", id }),
       });
       txt = await res.text();
@@ -150,7 +164,7 @@ const Cloud = (() => {
       return { ok: false, msg: "Ingresá la URL de la base compartida y guardá primero." };
     }
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store", credentials: "include" });
+      const res = await apiFetch("", { method: "GET", cache: "no-store", credentials: "include", headers: authHeaders() });
       const txt = await res.text();
       let n = -1;
       try {
@@ -173,7 +187,7 @@ const Cloud = (() => {
   async function lineas(force) {
     if (!isConfigured()) return lineasCache || [];
     if (!force && lineasCache) return lineasCache;
-    const res = await fetch(CONF.cloud.webAppUrl + "?lineas=1", { method: "GET", cache: "no-store", credentials: "include" });
+    const res = await apiFetch("?lineas=1", { method: "GET", cache: "no-store", credentials: "include", headers: authHeaders() });
     const arr = await res.json();
     lineasCache = Array.isArray(arr) ? arr : [];
     return lineasCache;
@@ -183,10 +197,10 @@ const Cloud = (() => {
     const n = String(nombre || "").trim().toUpperCase();
     if (!n) throw new Error("Nombre vacío");
     if (!isConfigured()) throw new Error("Sin conexión con la base");
-    const res = await fetch(CONF.cloud.webAppUrl, {
+    const res = await apiFetch("", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      headers: authHeaders({ "Content-Type": "text/plain;charset=utf-8" }),
       body: JSON.stringify({ action: "linea", nombre: n }),
     });
     const txt = (await res.text()).trim();
@@ -231,8 +245,7 @@ const Cloud = (() => {
   async function pullAll(force) {
     if (!isConfigured()) return [];
     if (!force && cache && Date.now() - cacheAt < TTL) return cache;
-    const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store", credentials: "include" });
-    const rows = await res.json();
+    const rows = await (await apiFetch("", { method: "GET", cache: "no-store", credentials: "include", headers: authHeaders() })).json();
     cache = dedupeRows(Array.isArray(rows) ? rows : []);
     cacheAt = Date.now();
     lastOk = Date.now();
@@ -261,10 +274,11 @@ const Cloud = (() => {
   async function imagenUrlDe(fileId) {
     if (!fileId || !isConfigured()) return "";
     try {
-      const res = await fetch(CONF.cloud.webAppUrl + "?img=" + encodeURIComponent(fileId), {
+      const res = await apiFetch("?img=" + encodeURIComponent(fileId), {
         method: "GET",
         cache: "no-store",
         credentials: "include",
+        headers: authHeaders(),
       });
       const data = await res.json();
       if (!data || !data.ok || !data.b64) return "";

@@ -5,7 +5,7 @@
    ============================================================ */
 "use strict";
 
-const VERSION = "htat-sw-v40";
+const VERSION = "htat-sw-v41";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,6 +13,7 @@ const ASSETS = [
   "./css/styles.css",
   "./lib/jspdf.umd.min.js",
   "./js/conf.js",
+  "./js/auth.js",
   "./js/store.js",
   "./js/signature.js",
   "./js/photos.js",

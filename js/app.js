@@ -95,6 +95,7 @@
     cfgInfoVersion: $("cfgInfoVersion"),
     btnCfgSync: $("btnCfgSync"),
     btnCfgUpdate: $("btnCfgUpdate"),
+    btnCfgLogout: $("btnCfgLogout"),
     btnCfgClose: $("btnCfgClose"),
   };
 
@@ -1269,6 +1270,51 @@
     location.reload();
   });
 
+  /* ---------- Sesión (usuario y contraseña) ---------- */
+  els.btnCfgLogout.addEventListener("click", async () => {
+    setBusy(els.btnCfgLogout, true);
+    try {
+      await Auth.logout();
+      Auth.mostrarLogin("Sesión cerrada. Ingresá para conectar el historial.");
+      toast("Sesión cerrada", "ok");
+    } catch (e) {
+      toast("No se pudo cerrar la sesión", "err");
+    } finally {
+      setBusy(els.btnCfgLogout, false);
+    }
+  });
+
+  /* Al abrir la app: si hay un token guardado se valida contra la base;
+     si es inválido (o no hay token) se muestra la pantalla de login.
+     Sin conexión no se bloquea: la app sigue funcionando en modo local. */
+  function iniciarSesionInicial() {
+    if (Auth.estaLogueado()) {
+      Auth.validar().then((v) => {
+        if (v.ok) return;
+        if (v.error === "expirada") {
+          Auth.mostrarLogin("Tu sesión venció. Ingresá de nuevo para conectar el historial.");
+        }
+        /* error "red" (sin conexión): se continúa con los datos locales */
+      });
+    } else if (navigator.onLine !== false) {
+      Auth.mostrarLogin("Ingresá para conectar el historial compartido.");
+    }
+  }
+
+  /* Respuesta de la pantalla de login: refresca todo cuando entra.
+     (AuthCallback es llamado por js/auth.js tras ingresar.) */
+  window.AuthCallback = (estado, detalle) => {
+    if (estado !== "ok") return;
+    toast(detalle === "primer_usuario"
+      ? "Usuario creado · sesión iniciada"
+      : "Sesión iniciada · historial conectado", "ok");
+    refreshCount();
+    cargarLineas();
+    Cloud.warm(() => refreshCount());
+    programarSync();
+    refrescarEnVivo();
+  };
+
   /* Cartel de conexión con la base compartida. Con conPrueba=true
      verifica la conexión automáticamente y muestra el resultado. */
   async function actualizarBadgeCloud(conPrueba) {
@@ -1489,6 +1535,7 @@
     actualizarBotonInstalar();
     Cloud.warm(() => { refreshCount(); });   // descarga en segundo plano el historial compartido (automático)
     programarSync();                       // sube en segundo plano lo pendiente de sincronizar
+    iniciarSesionInicial();                // comprueba la sesión y muestra el login si hace falta
     document.body.setAttribute("data-htat", "ready");
   }
 

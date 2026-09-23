@@ -7,7 +7,7 @@ const CONF = {
   appName: "HTAT",
   tagline: "Orden de Trabajo · Mantenimiento Predictivo y Preventivo",
   plant: "Planta HTAT",
-  version: "2.0",
+  version: "2.1",
 
   /* Claves de persistencia */
   storage: {

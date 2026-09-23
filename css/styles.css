@@ -765,3 +765,75 @@ textarea { resize: vertical; min-height: 96px; }
   animation: rot .7s linear infinite;
 }
 @keyframes rot { to { transform: rotate(360deg); } }
+
+/* ---------- Pantalla de inicio de sesión ---------- */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(242, 140, 40, .16), transparent 60%),
+    linear-gradient(160deg, var(--navy) 0%, #0a1e33 100%);
+}
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .4);
+  padding: 26px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-brand { text-align: center; }
+.auth-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: var(--navy);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 1px;
+  box-shadow: 0 8px 20px rgba(242, 140, 40, .35);
+}
+.auth-brand h1 { margin: 10px 0 2px; font-size: 20px; color: var(--navy); }
+.auth-brand p { margin: 0; font-size: 13px; color: var(--muted); }
+.auth-form { display: flex; flex-direction: column; gap: 10px; }
+.auth-field { display: flex; flex-direction: column; gap: 5px; }
+.auth-field label { font-size: 12.5px; font-weight: 600; color: var(--navy); }
+.auth-field input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 15px;
+  background: #fff;
+  color: var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.auth-field input:focus { outline: none; border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(242, 140, 40, .18); }
+.auth-err {
+  font-size: 12.5px;
+  color: var(--err);
+  background: var(--err-bg);
+  border: 1px solid rgba(195, 48, 48, .25);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.auth-submit { min-height: 48px; font-size: 15px; }
+.auth-submit.busy { opacity: .7; }
+.auth-offline { margin-top: 2px; font-size: 12.5px; color: var(--muted); text-decoration: none; }
+.auth-offline:hover { color: var(--navy); }
+.auth-hint { margin: 0; text-align: center; font-size: 11.5px; color: var(--muted); }
+.auth-overlay[hidden] { display: none; }

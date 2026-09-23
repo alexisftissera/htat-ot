@@ -29,11 +29,20 @@ index.html          Página principal (formulario de OT)
 manifest.json       Configuración PWA
 sw.js               Service worker (offline)
 css/styles.css      Estilos
-js/                 Lógica (conf, store, signature, photos, pdf, cloud, app)
+js/                 Lógica (conf, auth, store, signature, photos, pdf, cloud, app)
 lib/                Librerías (jsPDF)
 assets/             Íconos
 ```
 
 ## Seguridad
 
-El acceso al historial compartido está protegido con **Cloudflare Access** (ver `SEGURIDAD-PLAN.md`): solo el personal autorizado puede leer o escribir OTs.
+El historial compartido usa **login propio con usuario y contraseña** (ver `SEGURIDAD-PLAN.md`):
+- La API (`htat-api`) exige un **token de sesión** (`Authorization: Bearer ...`) en todas las operaciones. Sin sesión responde **401**.
+- Las contraseñas se guardan **encriptadas** (PBKDF2-SHA256) en la D1, nunca en texto plano.
+- La sesión dura **7 días** por navegador; sin conexión la app funciona en modo local.
+- El primer usuario se crea desde la propia pantalla de login ("Crear primer usuario"); después se agregan más con `accion: "agregar-usuario"`.
+
+Archivos clave de seguridad:
+- `worker-htat-api-login.js` — Worker de la API con login (pegar en htat-api).
+- `sql-crear-tablas-login.sql` — tablas `usuarios` y `sesiones` (Correr en la D1).
+- `js/auth.js` — pantalla de login de la app + manejo del token.
