@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0d2b45" />
+  <meta name="description" content="HTAT · Registro de mantenimiento preventivo y predictivo de planta." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="HTAT" />
+  <title>HTAT · Orden de Trabajo</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true">HTAT</span>
+        <div class="brand-text">
+          <h1>Orden de Trabajo</h1>
+          <p>Mantenimiento Predictivo y Preventivo de Planta</p>
+        </div>
+      </div>
+      <nav class="masthead-actions">
+        <button type="button" class="btn btn-ghost btn-icon" id="btnHistory" title="Historial de OT" aria-label="Historial de OT">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v5"/></svg>
+          <span class="btn-label">Historial</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnConfig" title="Configuración" aria-label="Configuración">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M4.2 6.6l2.6 1.5M17.2 15.9l2.6 1.5M3 12h3M18 12h3M4.2 17.4l2.6-1.5M17.2 8.1l2.6-1.5"/></svg>
+          <span class="btn-label">Config</span>
+        </button>
+<button type="button" class="btn btn-ghost btn-icon btn-install" id="btnInstall" title="Instalar como aplicación" aria-label="Instalar como aplicación" hidden>
+  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/><path d="M4 5h16"/></svg>
+  <span class="btn-label">Instalar</span>
+</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <div class="offline-banner" id="offlineBanner" hidden>Sin conexión · Los registros se guardan en el dispositivo</div>
+
+    <form id="otForm" class="ot-form" novalidate>
+
+      <!-- 1 · Identificación -->
+      <section class="card" aria-label="Identificación de la OT">
+        <h2 class="card-title"><span class="step">1</span> Identificación de la OT</h2>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="fOt">OT Nº<span class="req">*</span></label>
+            <input type="number" id="fOt" name="ot" inputmode="numeric" min="1" step="1" placeholder="15458" autocomplete="off" />
+            <p class="hint">Número de Orden de Trabajo asignado.</p>
+            <p class="err" id="errOt"></p>
+          </div>
+          <div class="field">
+            <label for="fFecha">Fecha de Emisión / Trabajo<span class="req">*</span></label>
+            <input type="date" id="fFecha" name="fecha" required />
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="fActivo">Activo / Nº de Máquina<span class="req">*</span></label>
+            <div class="combo">
+              <input type="text" id="fActivo" name="activo" placeholder="P302 - MA-500 HII OKUMA" autocomplete="off" spellcheck="false" />
+              <div class="combo-list" id="activoList" hidden></div>
+            </div>
+            <p class="hint">Debe comenzar con la letra <strong>P</strong>.</p>
+            <p class="err" id="errActivo"></p>
+          </div>
+          <div class="field">
+            <label for="fLinea">Línea<span class="req">*</span></label>
+            <select id="fLinea" name="linea">
+              <option value="">— Seleccionar —</option>
+              <option value="SOPORTE">SOPORTE</option>
+              <option value="CARRIER">CARRIER</option>
+              <option value="CARRIER FORD">CARRIER FORD</option>
+              <option value="ATTACHMENT">ATTACHMENT</option>
+              <option value="KNUCKLE">KNUCKLE</option>
+            </select>
+            <p class="hint">Se completa según la máquina. Para sumar una línea nueva, elegí «+ Agregar línea…».</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 · Plan -->
+      <section class="card" aria-label="Tipo de plan y tareas">
+        <h2 class="card-title"><span class="step">2</span> Tipo de Plan / Tareas</h2>
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="fPlan">Tipo de Plan<span class="req">*</span></label>
+            <select id="fPlan" name="plan">
+              <option value="">— Seleccionar —</option>
+              <option value="PREDICTIVOS">PREDICTIVOS</option>
+              <option value="PREVENTIVOS">PREVENTIVOS</option>
+              <option value="TAREA COMPLEMENTARIA">TAREA COMPLEMENTARIA</option>
+              <option value="INTERVENCION POR AVERIA">INTERVENCIÓN POR AVERÍA</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fParte">Detalle de la Tarea / Parte</label>
+            <input type="text" id="fParte" name="parte" placeholder="Sistema de refrigeración principal" autocomplete="off" />
+            <p class="hint">Parte o sistema afectado.</p>
+          </div>
+          <div class="field">
+            <label for="fTarea">Tarea Específica</label>
+            <input type="text" id="fTarea" name="tarea" placeholder="Medición de corriente equipo de refrigeración principal" autocomplete="off" />
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 · Métricas -->
+      <section class="card" aria-label="Métricas operativas del equipo">
+        <h2 class="card-title"><span class="step">3</span> Métricas Operativas del Equipo</h2>
+        <div class="grid grid-2">
+          <div class="field field-unit">
+            <label for="fEnergia">Consumo de Energía</label>
+            <div class="unit-row">
+              <input type="number" id="fEnergia" name="energia" inputmode="decimal" step="any" placeholder="12.5" />
+              <select id="fEnergiaU" name="energiaU" aria-label="Unidad de consumo">
+                <option value="A" selected>A (Amperios)</option>
+                <option value="Amp">Amp</option>
+                <option value="kWh">kWh</option>
+                <option value="kW">kW</option>
+                <option value="V">V (Voltios)</option>
+              </select>
+            </div>
+          </div>
+          <div class="field field-unit">
+            <label for="fPresion">Presión de Gas</label>
+            <div class="unit-row">
+              <input type="number" id="fPresion" name="presion" inputmode="decimal" step="any" placeholder="150" />
+              <select id="fPresionU" name="presionU" aria-label="Unidad de presión">
+                <option value="PSI" selected>PSI</option>
+                <option value="Bar">Bar</option>
+                <option value="kPa">kPa</option>
+                <option value="MPa">MPa</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 · Novedad -->
+      <section class="card" aria-label="Novedad de la máquina">
+        <h2 class="card-title"><span class="step">4</span> Novedad de la Máquina</h2>
+        <div class="novedad-group" role="radiogroup" aria-label="Novedad de la máquina">
+          <label class="novedad-opt"><input type="radio" name="novedad" id="fNovedadNo" value="sin" checked /><span>Sin novedad</span></label>
+          <label class="novedad-opt"><input type="radio" name="novedad" id="fNovedadSi" value="con" /><span>Con novedad</span></label>
+        </div>
+        <p class="hint">Indicá si la máquina quedó en condiciones normales o si tiene alguna novedad pendiente de seguimiento.</p>
+      </section>
+
+      <!-- 5 · Observaciones -->
+      <section class="card" aria-label="Observaciones">
+        <h2 class="card-title"><span class="step">5</span> Observaciones</h2>
+        <div class="field">
+          <label for="fObs" class="sr-only">Observaciones</label>
+          <textarea id="fObs" name="obs" rows="4" placeholder="Limpieza realizada, estado de la máquina, reparaciones efectuadas, repuestos utilizados…"></textarea>
+        </div>
+      </section>
+
+      <!-- 6 · Evidencia -->
+      <section class="card" aria-label="Evidencia fotográfica">
+        <h2 class="card-title"><span class="step">6</span> Evidencia Fotográfica <span class="badge" id="photoCount">0/9</span></h2>
+        <div class="photo-actions">
+          <button type="button" class="btn btn-secondary" id="btnCamara">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Tomar foto
+          </button>
+          <button type="button" class="btn btn-secondary" id="btnGalerium">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 4.5-4.5 3 3L16 11l4.5 4.5"/></svg>
+            Añadir de galería
+          </button>
+        </div>
+        <input type="file" id="fileCamara" accept="image/*" capture="environment" hidden />
+        <input type="file" id="fileGaleria" accept="image/*" multiple hidden />
+        <ul class="photo-grid" id="photoGrid"></ul>
+      </section>
+
+      <!-- 7 · Firma -->
+      <section class="card" aria-label="Firma digital">
+        <h2 class="card-title"><span class="step">7</span> Firma Digital</h2>
+        <div class="signature-wrap">
+          <canvas id="sigCanvas" aria-label="Panel de firma"></canvas>
+          <div class="signature-tools">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnClearSig">Limpiar firma</button>
+            <span class="hint" id="sigHint">Firme sobre el recuadro con el dedo o el mouse (firma obligatoria para cerrar).</span>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="fFirmaNombre">Aclaración de Firma — ¿Quién firma?<span class="req">*</span></label>
+            <select id="fFirmaNombre" name="firmaNombre">
+              <option value="Tissera Hector">Tissera Hector</option>
+              <option value="Tissera Alexis">Tissera Alexis</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fFirmaFecha">Fecha de la Firma<span class="req">*</span></label>
+            <input type="date" id="fFirmaFecha" name="firmaFecha" />
+          </div>
+        </div>
+      </section>
+
+    </form>
+
+    <div class="actionbar" aria-label="Acciones finales">
+      <button type="button" class="btn btn-primary btn-lg" id="btnDownloadPdf">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 20h16"/></svg>
+        Descargar PDF
+      </button>
+      <button type="button" class="btn btn-secondary btn-lg" id="btnSave">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 4h11l3 3v13H5V4Z"/><path d="M8 4v5h7V4M8 20v-5h8v5"/></svg>
+        Guardar
+      </button>
+    </div>
+
+    <footer class="pagefoot">
+      HTAT · OTs <span id="footCount">0</span> registradas · <button type="button" class="linklike" id="btnNewForm">Nuevo registro</button>
+    </footer>
+  </main>
+
+  <!-- Visor de foto -->
+  <div class="modal-backdrop" id="modalPreview" hidden>
+    <div class="modal modal-photo">
+      <img id="previewImg" alt="Vista previa" />
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnPreviewClose">Cerrar</button>
+        <button type="button" class="btn btn-danger" id="btnPreviewDelete">Quitar foto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial -->
+  <div class="modal-backdrop modal-full" id="modalHistory" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2>Historial de Ordenes de Trabajo <span class="modal-count" id="histCount"></span><span class="hist-maq-title" id="histMaqTitle" hidden></span></h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnHistClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+<div class="history-toolbar">
+        <div class="history-search">
+          <input type="search" id="histSearch" placeholder="Buscar por OT, fecha, máquina o línea…" />
+          <button type="button" class="btn btn-secondary btn-search" id="btnHistSearch" aria-label="Buscar" title="Buscar">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </button>
+        </div>
+        <div class="history-toolbar-row">
+          <label class="chk-hoy"><input type="checkbox" id="histHoy" checked /><span>Solo hoy</span></label>
+          <div class="history-toolbar-actions">
+            <button type="button" class="btn btn-secondary" id="btnHistLimpiar" hidden>Mostrar todas</button>
+            <button type="button" class="btn btn-secondary btn-novedades" id="btnNovedades">Novedades</button>
+            <button type="button" class="btn btn-secondary" id="btnMaquinas">Máquinas</button>
+            <button type="button" class="btn btn-secondary" id="btnResumen">Máquinas por mes</button>
+          </div>
+        </div>
+      </div>
+      <div id="histList" class="history-list"></div>
+      <div class="empty-state" id="histEmpty" hidden>No hay registros que coincidan con los filtros. Si está activado "Solo hoy", pruebe a desactivarlo o busque por máquina.</div>
+    </div>
+  </div>
+
+  <!-- Máquinas -->
+  <div class="modal-backdrop" id="modalMaquinas" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2>Máquinas Registradas</h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnMaqClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="hint">Toque una máquina para ver el detalle de todas las órdenes de trabajo realizadas sobre ella.</p>
+      <div id="maqList" class="history-list"></div>
+      <div class="empty-state" id="maqEmpty" hidden>Sin máquinas registradas todavía. Guarde una OT y la máquina quedará guardada aquí.</div>
+    </div>
+  </div>
+
+  <!-- Resumen mensual -->
+  <div class="modal-backdrop" id="modalResumen" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2>Máquinas por mes</h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnResumenClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="history-toolbar">
+        <select id="resumenMes" title="Filtrar por mes" aria-label="Filtrar por mes"></select>
+        <select id="resumenLinea" title="Filtrar por línea" aria-label="Filtrar por línea"></select>
+        <button type="button" class="btn btn-secondary" id="btnResumenLimpiar">Limpiar filtros</button>
+      </div>
+      <div id="resumenList" class="history-list"></div>
+      <div class="empty-state" id="resumenEmpty" hidden>Sin registros para los filtros elegidos.</div>
+    </div>
+  </div>
+
+  <!-- Novedades -->
+  <div class="modal-backdrop" id="modalNovedades" hidden>
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2>OTs con Novedad <span class="modal-count" id="novCount"></span></h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnNovedadesClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="hint">Son las OTs marcadas como <strong>con novedad</strong>. Para cerrar una novedad: edite la OT, cambie a <strong>Sin novedad</strong> y guárdela; dejará de aparecer acá.</p>
+      <div id="novList" class="history-list"></div>
+      <div class="empty-state" id="novEmpty" hidden>No hay OTs con novedad. Cuando una intervención deje novedad pendiente, quedará listada acá.</div>
+    </div>
+  </div>
+
+  <!-- Configuración -->
+  <div class="modal-backdrop" id="modalConfig" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Configuración</h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnCfgClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="cloud-badge" id="cfgCloudBadge"></div>
+      <dl class="cfg-info">
+        <div class="cfg-row"><dt>Base de datos</dt><dd id="cfgInfoBase">—</dd></div>
+        <div class="cfg-row"><dt>En la nube (todas las personas)</dt><dd id="cfgInfoNube">—</dd></div>
+        <div class="cfg-row"><dt>En este equipo</dt><dd id="cfgInfoLocal">—</dd></div>
+        <div class="cfg-row"><dt>Pendientes de subir</dt><dd id="cfgInfoPend">—</dd></div>
+        <div class="cfg-row"><dt>Fotos guardadas</dt><dd id="cfgInfoFotos">—</dd></div>
+        <div class="cfg-row"><dt>Última sincronización</dt><dd id="cfgInfoSync">—</dd></div>
+        <div class="cfg-row"><dt>Versión de la app</dt><dd id="cfgInfoVersion">—</dd></div>
+      </dl>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCfgSync">Sincronizar ahora</button>
+        <button type="button" class="btn btn-primary" id="btnCfgUpdate">Buscar actualización</button>
+      </div>
+      <p class="hint">
+        La conexión con el historial compartido es <strong>automática</strong>: no hay
+        nada que configurar. Esta pantalla solo muestra el estado.
+      </p>
+    </div>
+  </div>
+
+  <!-- Guía de instalación (se muestra solo si el navegador no permite instalar directo) -->
+  <div class="modal-backdrop" id="modalInstall" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Instalar HTAT</h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnInstallClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="hint">Para usar HTAT como aplicación instalada, seguí estos pasos:</p>
+      <ol class="install-guide">
+        <li>Tocá el botón <strong>Compartir</strong> (cuadro con flecha arriba) del navegador.</li>
+        <li>Elegí <strong>Agregar a pantalla de inicio</strong> / <strong>Add to Home Screen</strong>.</li>
+        <li>Confirmá y el ícono de HTAT quedará en tu pantalla de inicio.</li>
+      </ol>
+      <div class="modal-actions modal-actions-end">
+        <button type="button" class="btn btn-primary" id="btnInstallDone">Listo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script src="js/conf.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/signature.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/pdf.js"></script>
+  <script src="js/cloud.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
