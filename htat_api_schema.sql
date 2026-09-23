@@ -1,0 +1,33 @@
+-- HTAT · Tabla del historial compartido (Cloudflare D1)
+-- Pegar en: Cloudflare > D1 > base "htat" > pestaña "Console"
+
+CREATE TABLE IF NOT EXISTS ots (
+  id                TEXT PRIMARY KEY,
+  ot                INTEGER,
+  fechaEmision      TEXT,
+  linea             TEXT,
+  activo            TEXT,
+  tipoPlan          TEXT,
+  parteSistema      TEXT,
+  tareaEspecifica   TEXT,
+  consumoEnergia    TEXT,
+  presionGas        TEXT,
+  observaciones     TEXT,
+  firmaNombre       TEXT,
+  firmaFecha        TEXT,
+  creadoEn          TEXT,
+  actualizadoEn     TEXT,
+  foto1             TEXT,
+  foto2             TEXT,
+  foto3             TEXT,
+  foto4             TEXT,
+  foto5             TEXT,
+  firmaImg          TEXT,
+  novedad           INTEGER DEFAULT 0
+);
+
+-- Líneas de producción (se cargan desde la app y se comparten).
+CREATE TABLE IF NOT EXISTS lineas (
+  nombre    TEXT PRIMARY KEY,
+  creadoEn  TEXT
+);
