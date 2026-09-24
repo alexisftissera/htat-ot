@@ -46,7 +46,9 @@ const Cloud = (() => {
   /* Devuelve una OT con la forma que usa la app para el historial. */
   function toRecord(row) {
     const fotoIds = [];
-    for (let n = 1; n <= 5; n++) {
+    /* La base compartida guarda hasta CONF.limits.maxFotos (9). Se leen
+       todas las columnas fotoN para que ninguna evidencia se pierda. */
+    for (let n = 1; n <= CONF.limits.maxFotos; n++) {
       const fid = row["foto" + n];
       if (fid) fotoIds.push(String(fid));
     }

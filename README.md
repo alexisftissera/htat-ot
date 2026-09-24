@@ -22,6 +22,10 @@ htat-ot (frontend, este repo)
 
 Frontend publicado en Cloudflare Workers. El historial compartido se conecta por defecto a la base del taller definida en `js/conf.js` (`CONF.cloud`).
 
+La carpeta `deploy/` contiene el Worker de la API (`htat-api`) y la migración
+D1 necesarios para desplegar cambios de la base compartida — ver
+`deploy/LEEME-DEPLOY.md` (allí está documentado el fix de las fotos 5 → 9).
+
 ## Estructura
 
 ```
@@ -31,6 +35,7 @@ sw.js               Service worker (offline)
 css/styles.css      Estilos
 js/                 Lógica (conf, store, signature, photos, pdf, cloud, app)
 lib/                Librerías (jsPDF)
+deploy/             API del historial (Worker htat-api) + migraciones D1
 assets/             Íconos
 ```
 
