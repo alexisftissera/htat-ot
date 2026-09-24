@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS ots (
   foto3             TEXT,
   foto4             TEXT,
   foto5             TEXT,
+  foto6             TEXT,
+  foto7             TEXT,
+  foto8             TEXT,
+  foto9             TEXT,
   firmaImg          TEXT,
   novedad           INTEGER DEFAULT 0
 );

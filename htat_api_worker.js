@@ -11,14 +11,22 @@
    Bindings requeridos (Configuracion del Worker):
      - D1  con nombre  DB      -> base htat
      - R2  con nombre  BUCKET  -> bucket htat-evidencias
+
+   Fotografías: se guardan/leen hasta 9 (columnas foto1..foto9).
+   Para bases existentes correr antes la migración correspondiente
+   (deploy/sql-migracion-9-fotos.sql); para bases nuevas el esquema
+   htat_api_schema.sql ya incluye las 9 columnas.
    ============================================================ */
 
 const COLUMNAS = [
   "id", "ot", "fechaEmision", "linea", "activo", "tipoPlan", "parteSistema",
   "tareaEspecifica", "consumoEnergia", "presionGas", "observaciones",
   "firmaNombre", "firmaFecha", "creadoEn", "actualizadoEn",
-  "foto1", "foto2", "foto3", "foto4", "foto5", "firmaImg", "novedad",
+  "foto1", "foto2", "foto3", "foto4", "foto5",
+  "foto6", "foto7", "foto8", "foto9", "firmaImg", "novedad",
 ];
+
+const N_FOTOS = 9;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -96,16 +104,16 @@ async function guardar(env, datos) {
   if (datos.conservarImagenes) {
     /* No llegaron las fotos (sin conexion): se conservan las que ya hay. */
     const actual = await env.DB
-      .prepare("SELECT foto1,foto2,foto3,foto4,foto5,firmaImg FROM ots WHERE id = ?")
+      .prepare("SELECT foto1,foto2,foto3,foto4,foto5,foto6,foto7,foto8,foto9,firmaImg FROM ots WHERE id = ?")
       .bind(id)
       .first();
-    for (let i = 1; i <= 5; i++) fila["foto" + i] = actual ? actual["foto" + i] || "" : "";
+    for (let i = 1; i <= N_FOTOS; i++) fila["foto" + i] = actual ? actual["foto" + i] || "" : "";
     fila.firmaImg = actual ? actual.firmaImg || "" : "";
   } else {
     await borrarPrefijo(env, "fotos/" + id + "/");
     await borrarPrefijo(env, "firmas/" + id + ".");
-    const fotos = Array.isArray(datos.fotos) ? datos.fotos.slice(0, 5) : [];
-    for (let i = 1; i <= 5; i++) {
+    const fotos = Array.isArray(datos.fotos) ? datos.fotos.slice(0, N_FOTOS) : [];
+    for (let i = 1; i <= N_FOTOS; i++) {
       const dataUrl = fotos[i - 1];
       const d = parseDataUrl(dataUrl);
       const clave = "fotos/" + id + "/" + i + "." + extDe(d && d.mime);

@@ -113,6 +113,6 @@ de la estructura.
 ---
 
 ## Quedan pendientes (opcional, recomendado)
-- Corregir el bug de **fotos 5 vs 9** (la app permite 9 fotos pero la nube guarda/lee solo 5).
+- ~~Corregir el bug de **fotos 5 vs 9**~~ ✅ Hecho: la app y la API ahora guardan/leen hasta 9 fotos (ver `deploy/LEEME-DEPLOY.md`).
 - Activar la **verificación de dos pasos** en las cuentas del personal autorizado.
 - Considerar **IP Access Rules** extra o **bot management** para capas adicionales.

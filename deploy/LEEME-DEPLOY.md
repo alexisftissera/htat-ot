@@ -7,30 +7,32 @@ nube solo guardaba/leía **5** (el Worker descartaba en silencio las fotos 6 a 9
 
 | Archivo | Qué es |
 |---|---|
-| `worker-htat-api.js` | Worker de la API (`htat-api`) actualizado a 9 fotos |
-| `sql-migracion-9-fotos.sql` | Migración D1: agrega las columnas `foto6..foto9` a la tabla `ots` |
+| `htat_api_worker.js` (raíz) | Worker de la API (`htat-api`) actualizado a 9 fotos |
+| `htat_api_schema.sql` (raíz) | Esquema D1 completo para **bases nuevas** (ya trae `foto1..foto9`) |
+| `deploy/sql-migracion-9-fotos.sql` | Migración D1 para **bases existentes**: agrega `foto6..foto9` a la tabla `ots` |
 
 ## Orden de aplicación (NO cambiar el orden)
 
 ### Paso 1 · Migración D1 (primero sí o sí)
 1. Dashboard de Cloudflare → **Workers & Pages** → `htat-api` → **Settings** → **D1** → tu base (p. ej. `htat`) → **Consola**.
-2. Pegá el contenido de `sql-migracion-9-fotos.sql` y ejecutalo.
+2. Pegá el contenido de `deploy/sql-migracion-9-fotos.sql` y ejecutalo.
 3. La verificación final debe mostrar las 9 columnas `foto1..foto9`.
 
-> Si tu tabla `ots` todavía conserva las 18 OTs, la migración **no toca los datos**:
-> solo agrega columnas nuevas (quedan vacías en los registros existentes).
+> Si tu tabla `ots` todavía conserva las OTs migradas, la migración **no toca
+> los datos**: solo agrega columnas nuevas (quedan vacías en los registros
+> existentes).
 
 ### Paso 2 · Actualizar el Worker `htat-api`
 1. Dashboard → **Workers & Pages** → `htat-api` → **Edit code**.
-2. Reemplazá TODO el código por el de `deploy/worker-htat-api.js` → **Save and deploy**.
+2. Reemplazá TODO el código por el de `htat_api_worker.js` (raíz) → **Save and deploy**.
 3. Verificación rápida desde una terminal:
    ```
    curl https://htat-api.htat.workers.dev/
    ```
    Debe seguir devolviendo el historial (JSON), igual que antes.
 
-> Si tu Worker desplegado tenía cambios propios (distintos a la versión
-> "original"), aplicá sobre tu copia estos tres cambios nada más:
+> Si tu Worker desplegado tenía cambios propios (distintos a `htat_api_worker.js`),
+> aplicá sobre tu copia estos tres cambios nada más:
 > 1. Agregar `"foto6"…"foto9"` a `COLUMNAS`.
 > 2. `slice(0, 5)` → `slice(0, 9)` y los `for` de fotos hasta 9.
 > 3. En el SELECT de `conservarImagenes`, incluir `foto6..foto9`.
