@@ -43,6 +43,9 @@
     btnNewForm: $("btnNewForm"),
     btnHistory: $("btnHistory"),
     btnConfig: $("btnConfig"),
+    btnUser: $("btnUser"),
+    userAvatar: $("userAvatar"),
+    userName: $("userName"),
     btnInstall: $("btnInstall"),
     modalInstall: $("modalInstall"),
     btnInstallClose: $("btnInstallClose"),
@@ -93,6 +96,12 @@
     cfgInfoFotos: $("cfgInfoFotos"),
     cfgInfoSync: $("cfgInfoSync"),
     cfgInfoVersion: $("cfgInfoVersion"),
+    cfgInfoUsuario: $("cfgInfoUsuario"),
+    btnCfgLogout: $("btnCfgLogout"),
+    cfgUsuariosWrap: $("cfgUsuariosWrap"),
+    cfgUsuariosList: $("cfgUsuariosList"),
+    cfgUsuarioEmail: $("cfgUsuarioEmail"),
+    btnCfgUsuarioAdd: $("btnCfgUsuarioAdd"),
     btnCfgSync: $("btnCfgSync"),
     btnCfgUpdate: $("btnCfgUpdate"),
     btnCfgClose: $("btnCfgClose"),
@@ -1325,6 +1334,11 @@
     } catch (e) {
       els.cfgInfoNube.textContent = "sin conexión";
     }
+
+    mostrarSesion();
+    if (!els.cfgUsuariosWrap.hidden || Auth.esAdmin()) {
+      await renderUsuariosConfig().catch(() => {});
+    }
   }
 
   /* ---------- Actualización en vivo del historial ----------
@@ -1362,6 +1376,94 @@
   });
   window.addEventListener("focus", () => {
     if (els.histOpen || !els.modalConfig.hidden) refrescarEnVivo();
+  });
+
+  /* ---------- Sesión de Google ---------- */
+  function inicialUsuario() {
+    const u = Auth.usuario();
+    const base = (u && (u.nombre || u.email || "")) || "U";
+    return base.charAt(0).toUpperCase();
+  }
+  function mostrarSesion() {
+    const u = Auth.usuario();
+    if (!u) {
+      els.btnUser.hidden = true;
+      els.cfgInfoUsuario.textContent = "—";
+      return;
+    }
+    els.btnUser.hidden = false;
+    els.userAvatar.textContent = inicialUsuario();
+    els.userName.textContent = u.nombre || u.email || "Cuenta";
+    els.cfgInfoUsuario.textContent = u.email + (u.nombre ? " (" + u.nombre + ")" : "");
+  }
+  els.btnUser.addEventListener("click", () => {
+    els.modalConfig.hidden = false;
+    renderInfoConfig();
+  });
+  els.btnCfgLogout.addEventListener("click", () => {
+    if (!confirm("¿Cerrar la sesión actual? Para volver a usar la app tendrás que iniciar sesión con Google.")) return;
+    Auth.salir();
+  });
+
+  /* Administración de usuarios permitidos (solo visible para admins). */
+  async function renderUsuariosConfig() {
+    if (!Auth.esAdmin()) { els.cfgUsuariosWrap.hidden = true; return; }
+    els.cfgUsuariosWrap.hidden = false;
+    try {
+      const lista = await Cloud.usuariosPermitidos();
+      els.cfgUsuariosList.innerHTML = "";
+      lista.forEach((u) => {
+        const item = document.createElement("div");
+        item.className = "users-item";
+        const info = document.createElement("div");
+        info.className = "users-info";
+        const mail = document.createElement("span");
+        mail.className = "users-mail";
+        mail.textContent = u.email;
+        const det = document.createElement("span");
+        det.className = "users-det";
+        det.textContent = [u.nombre || "sin nombre", u.nivel === "admin" ? "administrador" : "usuario"]
+          .filter(Boolean).join(" · ");
+        info.append(mail, det);
+        const quitar = document.createElement("button");
+        quitar.type = "button";
+        quitar.className = "btn btn-danger btn-sm";
+        quitar.textContent = "Quitar";
+        quitar.addEventListener("click", async () => {
+          if (!confirm("¿Quitar a " + u.email + " del historial compartido?")) return;
+          try {
+            await Cloud.usuariosBorrar(u.email);
+            toast("Usuario quitado", "ok");
+            renderUsuariosConfig();
+          } catch (e) {
+            toast(e.message || "No se pudo quitar el usuario", "err");
+          }
+        });
+        item.append(info, quitar);
+        els.cfgUsuariosList.appendChild(item);
+      });
+    } catch (e) {
+      console.warn("htat: no se pudo leer la lista de usuarios", e);
+      els.cfgUsuariosWrap.hidden = true;
+    }
+  }
+  els.btnCfgUsuarioAdd.addEventListener("click", async () => {
+    const email = String(els.cfgUsuarioEmail.value || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      toast("Ingrese un email válido.", "err");
+      return;
+    }
+    setBusy(els.btnCfgUsuarioAdd, true);
+    try {
+      await Cloud.usuariosAgregar(email, "");
+      els.cfgUsuarioEmail.value = "";
+      toast("Usuario agregado: " + email, "ok");
+      await renderUsuariosConfig();
+    } catch (e) {
+      toast((e && e.message) || "No se pudo agregar el usuario", "err");
+    } finally {
+      setBusy(els.btnCfgUsuarioAdd, false);
+    }
   });
 
   /* ---------- Instalación PWA ---------- */
@@ -1472,7 +1574,7 @@
   }
 
   /* ---------- Inicio ---------- */
-  function init() {
+  async function init() {
     initSignature();
     bindInputs();
     Draft.clear();
@@ -1481,6 +1583,22 @@
     state.editId = null;
     renderPhotos();
     updateOnline();
+
+    /* Puerta de acceso: sin sesión de Google la app no arranca. */
+    await Auth.asegurarLogueado();
+    mostrarSesion();
+
+    /* Confirma el nivel (admin/usuario) contra la base en segundo plano. */
+    Cloud.quienSoy()
+      .then((perfil) => {
+        if (perfil) {
+          Auth.setNivel(perfil.nivel);
+          mostrarSesion();
+          if (!els.modalConfig.hidden) renderInfoConfig();
+        }
+      })
+      .catch(() => {});
+
     refreshCount();
     fillMaquinasDatalist();
     renderLineas();

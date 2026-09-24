@@ -34,6 +34,16 @@ const CONF = {
     webAppUrl: "https://htat-api.htat.workers.dev/",
   },
 
+  /* Autenticación con Google (Sign in with Google). Desde v3 el acceso
+     es OBLIGATORIO: quien no inicia sesión no puede usar la app. El
+     clientId se crea en Google Cloud Console (guía completa en
+     deploy/GUIA-GOOGLE-LOGIN.md) y es un dato PÚBLICO: va en el código
+     del navegador y también en el Worker (variable GOOGLE_CLIENT_ID). */
+  auth: {
+    clientId: "",               // OAuth Client ID de Google (tipo Web)
+    sessionKey: "htat.auth",    // localStorage: sesión activa (token + perfil)
+  },
+
   /* Límites */
   limits: {
     maxFotos: 9,

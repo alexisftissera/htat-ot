@@ -4,6 +4,10 @@
    por todas las personas que usan la app se acumulan en una
    misma base. El historial y el resumen mensual mezclan lo
    local (IndexedDB) con lo compartido (la base).
+
+   Desde v3 la API requiere sesión: cada llamada sale con
+   "Authorization: Bearer <token de Google>" y, si la sesión
+   caduca (HTTP 401), se renueva automáticamente y se reintenta.
    ============================================================ */
 "use strict";
 
@@ -16,9 +20,38 @@ const Cloud = (() => {
   const TTL = 60000;
 
   function lastSync() { return lastOk; }
+  function base() { return (CONF.cloud.webAppUrl || "").replace(/\/+$/, ""); }
 
+  /* Hace falta configuración Y sesión de Google activa. */
   function isConfigured() {
-    return !!(CONF.cloud && /^https:\/\//.test(CONF.cloud.webAppUrl || ""));
+    return Auth.haySesion() && /^https:\/\//.test(CONF.cloud.webAppUrl || "");
+  }
+
+  /* Fetch con sesión: agrega la cabecera Authorization y, ante 401,
+     renueva la sesión (Auth) y reintenta una vez. */
+  async function api(recursos, init) {
+    if (!Auth.haySesion()) throw new Error("Necesitás iniciar sesión con Google para usar el historial compartido.");
+    const opts = init || {};
+    const headers = new Headers(opts.headers || {});
+    headers.set("Authorization", "Bearer " + Auth.token());
+    const config = Object.assign({}, opts, { headers });
+    if (opts.cache) config.cache = opts.cache;
+
+    for (let intento = 1; intento <= 2; intento++) {
+      let res;
+      try {
+        res = await fetch(base() + recursos, config);
+      } catch (e) {
+        throw new Error("No se pudo contactar la base: " + e.message);
+      }
+      if (res.status === 401 && intento === 1) {
+        await Auth.sesionInvalida().catch(() => null);
+        headers.set("Authorization", "Bearer " + Auth.token());
+        continue;
+      }
+      return res;
+    }
+    throw new Error("Sesión de Google no válida. Volvé a iniciar sesión.");
   }
 
   /* Registro ligero (sin fotos ni imagen de firma) para la base. */
@@ -99,7 +132,7 @@ const Cloud = (() => {
     }
     let txt;
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, {
+      const res = await api("/", {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(carga),
@@ -124,7 +157,7 @@ const Cloud = (() => {
     if (!isConfigured()) return false;
     let txt;
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, {
+      const res = await api("/", {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({ action: "delete", id }),
@@ -147,10 +180,10 @@ const Cloud = (() => {
   /* Prueba de conexión: lee los registros de la base y devuelve el resultado. */
   async function probar() {
     if (!isConfigured()) {
-      return { ok: false, msg: "Ingresá la URL de la base compartida y guardá primero." };
+      return { ok: false, msg: "Ingresá con tu cuenta de Google para conectar el historial compartido." };
     }
     try {
-      const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store" });
+      const res = await api("/", { method: "GET", cache: "no-store" });
       const txt = await res.text();
       let n = -1;
       try {
@@ -167,13 +200,23 @@ const Cloud = (() => {
     }
   }
 
+  /* Perfil en la base: email, nombre y nivel (admin/usuario). Sirve para
+     saber si la persona puede administrar los usuarios permitidos. */
+  async function quienSoy() {
+    if (!isConfigured()) return null;
+    const res = await api("/?yo=1", { method: "GET", cache: "no-store" });
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d && d.email ? { email: d.email, nombre: d.nombre || "", foto: d.foto || "", nivel: d.nivel || "usuario" } : null;
+  }
+
   /* ---------- líneas compartidas ---------- */
   let lineasCache = null;
 
   async function lineas(force) {
     if (!isConfigured()) return lineasCache || [];
     if (!force && lineasCache) return lineasCache;
-    const res = await fetch(CONF.cloud.webAppUrl + "?lineas=1", { method: "GET", cache: "no-store" });
+    const res = await api("/?lineas=1", { method: "GET", cache: "no-store" });
     const arr = await res.json();
     lineasCache = Array.isArray(arr) ? arr : [];
     return lineasCache;
@@ -183,7 +226,7 @@ const Cloud = (() => {
     const n = String(nombre || "").trim().toUpperCase();
     if (!n) throw new Error("Nombre vacío");
     if (!isConfigured()) throw new Error("Sin conexión con la base");
-    const res = await fetch(CONF.cloud.webAppUrl, {
+    const res = await api("/", {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "linea", nombre: n }),
@@ -193,6 +236,32 @@ const Cloud = (() => {
     if (Array.isArray(lineasCache) && !lineasCache.includes(n)) lineasCache.push(n);
     else lineasCache = null;
     return n;
+  }
+
+  /* ---------- usuarios permitidos (solo administradores) ---------- */
+  async function usuariosPermitidos() {
+    const res = await api("/?usuarios=1", { method: "GET", cache: "no-store" });
+    const d = await res.json();
+    if (!res.ok) throw new Error((d && d.error) || "No se pudo leer la lista de usuarios.");
+    return Array.isArray(d) ? d : [];
+  }
+  async function usuariosAgregar(email, nombre) {
+    const res = await api("/", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "usuario-agregar", email, nombre }),
+    });
+    const txt = (await res.text()).trim();
+    if (txt !== "OK") throw new Error("La base no confirmó: " + txt.slice(0, 80));
+  }
+  async function usuariosBorrar(email) {
+    const res = await api("/", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "usuario-borrar", email }),
+    });
+    const txt = (await res.text()).trim();
+    if (txt !== "OK") throw new Error("La base no confirmó: " + txt.slice(0, 80));
   }
 
   /* Cuál de las dos versiones de una misma OT es más reciente. */
@@ -230,7 +299,7 @@ const Cloud = (() => {
   async function pullAll(force) {
     if (!isConfigured()) return [];
     if (!force && cache && Date.now() - cacheAt < TTL) return cache;
-    const res = await fetch(CONF.cloud.webAppUrl, { method: "GET", cache: "no-store" });
+    const res = await api("/", { method: "GET", cache: "no-store" });
     const rows = await res.json();
     cache = dedupeRows(Array.isArray(rows) ? rows : []);
     cacheAt = Date.now();
@@ -260,7 +329,7 @@ const Cloud = (() => {
   async function imagenUrlDe(fileId) {
     if (!fileId || !isConfigured()) return "";
     try {
-      const res = await fetch(CONF.cloud.webAppUrl + "?img=" + encodeURIComponent(fileId), {
+      const res = await api("/?img=" + encodeURIComponent(fileId), {
         method: "GET",
         cache: "no-store",
       });
@@ -309,5 +378,9 @@ const Cloud = (() => {
     }
   }
 
-  return { isConfigured, push, del, probar, pullAll, mergedAll, mergedFast, isFresh, warm, imagenesDe, lastSync, lineas, agregarLinea };
+  return {
+    isConfigured, push, del, probar, pullAll, mergedAll, mergedFast, isFresh,
+    warm, imagenesDe, lastSync, lineas, agregarLinea,
+    quienSoy, usuariosPermitidos, usuariosAgregar, usuariosBorrar,
+  };
 })();

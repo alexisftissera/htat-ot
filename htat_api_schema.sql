@@ -35,3 +35,13 @@ CREATE TABLE IF NOT EXISTS lineas (
   nombre    TEXT PRIMARY KEY,
   creadoEn  TEXT
 );
+
+-- Usuarios permitidos (login con Google obligatorio desde v3).
+-- El administrador principal se define con la variable HTAT_ADMIN
+-- del Worker y siempre tiene acceso aunque no esté en esta tabla.
+CREATE TABLE IF NOT EXISTS usuarios (
+  email     TEXT PRIMARY KEY,
+  nombre    TEXT,
+  nivel     TEXT DEFAULT 'usuario',   -- 'admin' | 'usuario'
+  creadoEn  TEXT
+);

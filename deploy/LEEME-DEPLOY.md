@@ -1,15 +1,18 @@
-# 🔧 Despliegue — Fix fotos 5 → 9
+# 🔧 Despliegue — app HTAT
 
-Guía para aplicar el arreglo del bug donde la app permitía **9 fotos** pero la
-nube solo guardaba/leía **5** (el Worker descartaba en silencio las fotos 6 a 9).
+Guía de despliegue del repo. Contiene (1) el fix de fotos 5 → 9 y (2) el login
+obligatorio con Google (v3).
 
 ## Archivos
 
 | Archivo | Qué es |
 |---|---|
-| `htat_api_worker.js` (raíz) | Worker de la API (`htat-api`) actualizado a 9 fotos |
-| `htat_api_schema.sql` (raíz) | Esquema D1 completo para **bases nuevas** (ya trae `foto1..foto9`) |
-| `deploy/sql-migracion-9-fotos.sql` | Migración D1 para **bases existentes**: agrega `foto6..foto9` a la tabla `ots` |
+| `htat_api_worker.js` (raíz) | Worker de la API (`htat-api`): 9 fotos + **login Google obligatorio** |
+| `auth-core.mjs` (raíz) | Núcleo de autenticación (lo importa el Worker) |
+| `htat_api_schema.sql` (raíz) | Esquema D1 completo para **bases nuevas** (9 fotos + tabla `usuarios`) |
+| `deploy/sql-migracion-9-fotos.sql` | Migración D1 para **bases existentes**: agrega `foto6..foto9` |
+| `deploy/sql-migracion-login.sql` | Migración D1 para **bases existentes**: crea la tabla `usuarios` |
+| `deploy/GUIA-GOOGLE-LOGIN.md` | Paso a paso para crear el OAuth Client ID de Google |
 
 ## Orden de aplicación (NO cambiar el orden)
 
@@ -63,3 +66,75 @@ Por eso esta versión de `cloud.js` **revierte ese cambio**: la app vuelve a
 funcionar con la API actual. Si más adelante retomás el plan de seguridad,
 hay que re-agregar `credentials: "include"` **y** cambiar el CORS del Worker
 (credenciales + origen permitido), no una sola de las dos cosas.
+
+---
+
+# v3 · Login obligatorio con Google
+
+Desde esta versión la app **no arranca sin iniciar sesión** con una cuenta de
+Google permitida (botón oficial "Continuar con Google"). El Worker valida el
+token contra Google y contra la lista de emails permitidos (tabla D1
+`usuarios`).
+
+> ⚠️ **El despliegue de la v3 depende de vos**: primero hay que crear el
+> **OAuth Client ID** en Google Cloud Console. Seguí
+> [`GUIA-GOOGLE-LOGIN.md`](GUIA-GOOGLE-LOGIN.md) y conseguí el ID antes de
+> continuar.
+
+## Orden de aplicación (NO cambiar el orden)
+
+### Paso 1 · OAuth Client ID de Google
+Ver `GUIA-GOOGLE-LOGIN.md`. Resultado: un ID tipo
+`xxxxxxxx.apps.googleusercontent.com`.
+
+### Paso 2 · Migración D1 — tabla `usuarios`
+1. Dashboard Cloudflare → **Workers & Pages** → `htat-api` → **Settings** →
+   **D1** → la base `htat` → **Consola**.
+2. Pegá y ejecutá `deploy/sql-migracion-login.sql`.
+3. La verificación debe listar la tabla `usuarios`.
+
+### Paso 3 · Desplegar Worker `htat-api` (con wrangler, recomendado)
+El Worker ahora tiene **dos archivos** (`htat_api_worker.js` + `auth-core.mjs`);
+wrangler los empaqueta solo. Con la config de `wrangler.toml` (binding D1 + R2):
+
+```
+wrangler deploy htat_api_worker.js
+wrangler secret put GOOGLE_CLIENT_ID   # o variable[GOOGLE_CLIENT_ID] en wrangler.toml
+wrangler secret put HTAT_ADMIN         # tu email de Google
+```
+
+> Si querés seguir pegando código por el dashboard (worker de un solo archivo),
+> generá el bundle una vez:
+> `npx wrangler deploy --dry-run --outdir dist` y pegá el contenido de
+> `dist/htat_api_worker.js` (el bundle incluye a `auth-core.mjs`).
+
+### Paso 4 · Desplegar frontend `htat-ot`
+1. En `js/conf.js` cargar `CONF.auth.clientId = "…"` (el ID del paso 1).
+2. Subir los archivos nuevos: `js/auth.js` (y las versiones nuevas de
+   `index.html`, `js/cloud.js`, `js/app.js`, `css/styles.css`, `sw.js`).
+
+### Paso 5 · Probar
+1. Abrí la app **sin** sesión guardada → debe aparecer el botón
+   "Continuar con Google". Con una cuenta **no permitida** → la app muestra
+   error y no entra. Con la cuenta admin (la de `HTAT_ADMIN`/primer usuario
+   agregado) → entra.
+2. Configuración → **Usuarios permitidos** → agregá el email de cada operario.
+3. Agregar un email, esperar la lista, y probar entrar desde otro dispositivo.
+
+## Variables de entorno del Worker `htat-api`
+
+| Variable | Obligatoria | Qué es |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | sí | Client ID de OAuth creado en el Paso 1 |
+| `HTAT_ADMIN` | sí | Email del administrador (siempre tiene acceso) |
+| `HTAT_ORIGENES` | no | Orígenes extra permitidos por CORS (separados por coma) |
+
+CORS permitido por defecto: `https://htat-ot.htat.workers.dev`,
+`http://localhost:8080` y `https://localhost:8080`.
+
+## Sin el despliegue de la v3
+
+Si todavía no está creado/desplegado el login, la app **sigue funcionando como
+antes** (sin Google) **solo si no se toca la API**: el Worker viejo ignora las
+nuevas exigencias. No mezclar: o se despliega la v3 completa, o se queda en la
+versión anterior.

@@ -764,4 +764,95 @@ textarea { resize: vertical; min-height: 96px; }
   display: inline-block;
   animation: rot .7s linear infinite;
 }
-@keyframes rot { to { transform: rotate(360deg); } }
+@keyframes rot { to { transform: rotate(360deg); } }/* ============================================================
+   Sesión de Google · Login obligatorio + administración de usuarios
+   ============================================================ */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background:
+    radial-gradient(1100px 500px at 85% -10%, rgba(242, 140, 40, .18), transparent 60%),
+    linear-gradient(160deg, var(--navy) 0%, #0a2238 55%, #081b2c 100%);
+}
+.login-screen[hidden] { display: none; }
+.login-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 380px;
+  padding: 32px 26px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .4);
+}
+.login-logo {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 14px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: .5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(242, 140, 40, .35);
+}
+.login-title { margin: 0 0 4px; font-size: 20px; color: var(--navy); }
+.login-tag { margin: 0 0 16px; font-size: 12.5px; color: var(--muted); }
+.login-button { display: flex; justify-content: center; margin: 18px 0 10px; }
+.login-loading { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+.login-loading[hidden] { display: none; }
+.login-err { color: var(--err); font-size: 13px; font-weight: 600; margin: 10px 0 0; }
+.login-err[hidden] { display: none; }
+body.login-abierto { overflow: hidden; }
+
+/* Chip de sesión en el encabezado */
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+#btnUser .btn-label { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Administración de usuarios (solo admin) */
+.cfg-users { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.cfg-users h3 { margin: 0 0 6px; font-size: 14px; color: var(--navy); }
+.users-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.users-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.users-info { display: flex; flex-direction: column; min-width: 0; }
+.users-mail { font-weight: 700; color: var(--navy); font-size: 13.5px; word-break: break-all; }
+.users-det { color: var(--muted); font-size: 12px; }
+.users-add { display: flex; gap: 8px; }
+.users-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+}
