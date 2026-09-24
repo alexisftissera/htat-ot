@@ -99,6 +99,18 @@ todo lo que no puede hacer (formulario, fotos, botones Editar/Eliminar, agregar
 líneas). Los permisos se confirman contra la base en cada inicio y en cada
 escritura (el Worker devuelve 403 si una cuenta de lectura intenta escribir).
 
+> ⚠️ **PUBLICAR la app OAuth en Google (paso obligatorio):** mientras el estado
+> sea "Prueba", Google solo deja entrar a los usuarios de prueba. Como el modelo
+> permite que **cualquier cuenta de Google vea** el historial, la app debe estar
+> **En producción**:
+> 1. Abrí [Público](https://console.cloud.google.com/auth/audience?project=htat-509623)
+>    en un navegador normal (con el mouse real, no desde automatización).
+> 2. Clic en **"Publicar app"** y confirmá el diálogo.
+> 3. La página queda en "En producción". No hace falta verificación (solo usamos
+>    scopes no sensibles: openid, email, profile).
+> 4. Mientras tanto, para probar, se pueden agregar **usuarios de prueba** en la
+>    misma página (hasta 100) para las cuentas de cada editor.
+
 ## Orden de aplicación (NO cambiar el orden)
 
 ### Paso 1 · OAuth Client ID de Google
