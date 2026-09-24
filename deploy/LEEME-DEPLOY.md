@@ -1,13 +1,14 @@
 # 🔧 Despliegue — app HTAT
 
-Guía de despliegue del repo. Contiene (1) el fix de fotos 5 → 9 y (2) el login
-obligatorio con Google (v3).
+Guía de despliegue del repo. Contiene (1) el fix de fotos 5 → 9, (2) el login
+obligatorio con Google (v3) y (3) el modelo de permisos **lectura abierta /
+edición por lista** (v4).<br><br>
 
 ## Archivos
 
 | Archivo | Qué es |
 |---|---|
-| `htat_api_worker.js` (raíz) | Worker de la API (`htat-api`): 9 fotos + **login Google obligatorio** |
+| `htat_api_worker.js` (raíz) | Worker de la API (`htat-api`): 9 fotos + **login Google** + **lectura abierta, edición por lista** |
 | `auth-core.mjs` (raíz) | Núcleo de autenticación (lo importa el Worker) |
 | `htat_api_schema.sql` (raíz) | Esquema D1 completo para **bases nuevas** (9 fotos + tabla `usuarios`) |
 | `deploy/sql-migracion-9-fotos.sql` | Migración D1 para **bases existentes**: agrega `foto6..foto9` |
@@ -72,14 +73,31 @@ hay que re-agregar `credentials: "include"` **y** cambiar el CORS del Worker
 # v3 · Login obligatorio con Google
 
 Desde esta versión la app **no arranca sin iniciar sesión** con una cuenta de
-Google permitida (botón oficial "Continuar con Google"). El Worker valida el
-token contra Google y contra la lista de emails permitidos (tabla D1
-`usuarios`).
+Google (botón oficial "Continuar con Google"). El Worker valida el token contra
+Google (JWKS + claims) y otorga permisos según la lista de usuarios permitidos
+(tabla D1 `usuarios`).
 
 > ⚠️ **El despliegue de la v3 depende de vos**: primero hay que crear el
 > **OAuth Client ID** en Google Cloud Console. Seguí
 > [`GUIA-GOOGLE-LOGIN.md`](GUIA-GOOGLE-LOGIN.md) y conseguí el ID antes de
 > continuar.
+
+---
+
+# v4 · Permisos: lectura abierta + editores por lista
+
+Modelo de permisos definitivo:
+
+| Rol | Quién lo tiene | Puede hacer |
+|---|---|---|
+| **Lectura** | Cualquier cuenta de Google con token válido | Ver el historial completo, fotos, líneas, resumen, PDFs. No toca nada. |
+| **Usuario (editor)** | Cuentas en la tabla D1 `usuarios` | Agregar, modificar y borrar OTs y líneas. |
+| **Admin** | `HTAT_ADMIN` o nivel `admin` en `usuarios` | Todo lo anterior + administrar la lista de usuarios desde Configuración. |
+
+La app detecta el rol en `/?yo=1`: muestra el banner "Modo lectura" y oculta
+todo lo que no puede hacer (formulario, fotos, botones Editar/Eliminar, agregar
+líneas). Los permisos se confirman contra la base en cada inicio y en cada
+escritura (el Worker devuelve 403 si una cuenta de lectura intenta escribir).
 
 ## Orden de aplicación (NO cambiar el orden)
 
@@ -115,11 +133,16 @@ wrangler secret put HTAT_ADMIN         # tu email de Google
 
 ### Paso 5 · Probar
 1. Abrí la app **sin** sesión guardada → debe aparecer el botón
-   "Continuar con Google". Con una cuenta **no permitida** → la app muestra
-   error y no entra. Con la cuenta admin (la de `HTAT_ADMIN`/primer usuario
-   agregado) → entra.
-2. Configuración → **Usuarios permitidos** → agregá el email de cada operario.
-3. Agregar un email, esperar la lista, y probar entrar desde otro dispositivo.
+   "Continuar con Google".
+2. Con una cuenta de Google **que no está en la lista** → entra en
+   **modo lectura**: ve el historial, los botones de edición están
+   ocultos/deshabilitados y aparece el banner "Modo lectura".
+3. Con la cuenta admin (la de `HTAT_ADMIN`/primer usuario) → entra con
+   permisos de edición.
+4. Configuración → **Usuarios con permiso de edición** → agregá el email de
+   cada operario (quedarán habilitados para cargar/modificar/borrar).
+5. Probar desde otro dispositivo: la cuenta agregada edita; cualquier otra
+   cuenta de Google solo ve.
 
 ## Variables de entorno del Worker `htat-api`
 

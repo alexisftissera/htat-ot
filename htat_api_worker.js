@@ -2,28 +2,32 @@
    HTAT · API del historial compartido
    Cloudflare Worker + D1 (datos) + R2 (fotos y firma)
 
-   Desde v3 la API ES PRIVADA: solo pueden usarla quienes
-   inician sesión con Google (Sign in with Google) y cuyo email
-   está en la lista de usuarios permitidos (tabla D1 "usuarios"
-   o el administrador definido en la variable HTAT_ADMIN).
+   Desde v4 el historial es de LECTURA ABIERTA: cualquier cuenta de
+   Google válida (token verificado contra Google) puede VER todo
+   (OTs, fotos, líneas, su perfil). Para AGREGAR, MODIFICAR o BORRAR
+   hace falta estar en la lista de usuarios permitidos (tabla D1
+   "usuarios" o el administrador de HTAT_ADMIN). La lista la maneja
+   un administrador desde la app.
 
    Contrato:
-     GET  /                    -> lista de OTs (JSON) [requiere sesión]
-     GET  /?img=<key>          -> { ok, mime, b64 } de una imagen
-     GET  /?lineas=1           -> lista de líneas compartidas
+     GET  /                    -> lista de OTs (JSON) [cualquier Google válido]
+     GET  /?img=<key>          -> { ok, mime, b64 } de una imagen  [ídem]
+     GET  /?lineas=1           -> lista de líneas compartidas       [ídem]
+     GET  /?yo=1               -> { email, nombre, foto, nivel }    [ídem]
      GET  /?usuarios=1         -> lista de usuarios permitidos (solo admin)
-     GET  /?yo=1               -> { email, nombre, foto, nivel } de la sesión
-     POST /  {OT...}           -> "OK"   (guarda/actualiza)
-     POST /  {action:"delete", id}           -> "OK"
-     POST /  {action:"linea", nombre}        -> "OK"
-     POST /  {action:"linea-borrar", nombre} -> "OK"
-     POST /  {action:"usuario-agregar", email}      -> "OK" (solo admin)
-     POST /  {action:"usuario-borrar", email}       -> "OK" (solo admin)
+     POST /  {OT...}                                 -> "OK"  [requiere edición]
+     POST /  {action:"delete", id}                   -> "OK"  [ídem]
+     POST /  {action:"linea", nombre}                -> "OK"  [ídem]
+     POST /  {action:"linea-borrar", nombre}         -> "OK"  [ídem]
+     POST /  {action:"usuario-agregar", email}       -> "OK" (solo admin)
+     POST /  {action:"usuario-borrar", email}        -> "OK" (solo admin)
 
    Autenticación: el cliente manda "Authorization: Bearer <id_token>"
    (token de Google). El Worker valida la firma RSA contra las claves
    públicas de Google (JWKS), comprueba las claims (emisor, audiencia,
-   expiración, email verificado) y que el email esté permitido.
+   expiración, email verificado) y asigna el nivel:
+     - "lectura": cualquier cuenta de Google válida (solo VER).
+     - "usuario"/"admin": cuentas de la lista permitida (edición).
 
    Variables de entorno del Worker:
      GOOGLE_CLIENT_ID  -> Client ID de OAuth 2.0 de Google (obligatorio)
@@ -220,8 +224,10 @@ function esAdmin(user) {
   return !!(user && (user.nivel === "admin"));
 }
 
-/* Middleware: exige sesión válida y email permitido.
-   Devuelve { error } con response 401/403 o { user }. */
+/* Middleware de LECTURA: exige sesión de Google válida. Cualquier
+   cuenta de Google funciona (nivel "lectura" si no está en la lista
+   permitida; "usuario"/"admin" si sí está). Devuelve { error } o
+   { user }. */
 async function autorizar(request, env, cors) {
   const m = /^Bearer\s+(.+)$/i.exec((request.headers.get("Authorization") || "").trim());
   let user = null;
@@ -241,11 +247,14 @@ async function autorizar(request, env, cors) {
   }
   const permitido = await esPermitido(env, user.email);
   if (!permitido) {
+    /* Cualquier cuenta de Google válida puede VER el historial. */
     return {
-      error: respuesta(403, cors, {
-        ok: false,
-        error: "La cuenta " + user.email + " no está autorizada en este historial",
-      }),
+      user: {
+        email: user.email,
+        nivel: "lectura",
+        nombre: user.nombre,
+        foto: user.foto,
+      },
     };
   }
   return {
@@ -256,6 +265,22 @@ async function autorizar(request, env, cors) {
       foto: user.foto,
     },
   };
+}
+
+/* Middleware de ESCRITURA: igual que autorizar, pero exige estar en
+   la lista permitida (nivel "usuario" o "admin"). */
+async function autorizarEscritura(request, env, cors) {
+  const base = await autorizar(request, env, cors);
+  if (base.error) return base;
+  if (base.user.nivel === "lectura") {
+    return {
+      error: respuesta(403, cors, {
+        ok: false,
+        error: "La cuenta " + base.user.email + " puede ver el historial, pero no modificarlo. Pedí permiso de edición al administrador.",
+      }),
+    };
+  }
+  return base;
 }
 
 /* ---------- guardar / actualizar ---------- */
@@ -440,31 +465,31 @@ export default {
       if (request.method === "POST") {
         const cuerpo = await request.json().catch(() => ({}));
         if (cuerpo && cuerpo.action === "delete") {
-          const auth = await autorizar(request, env, cors);
+          const auth = await autorizarEscritura(request, env, cors);
           if (auth.error) return auth.error;
           return await borrar(env, cors, cuerpo.id);
         }
         if (cuerpo && cuerpo.action === "linea") {
-          const auth = await autorizar(request, env, cors);
+          const auth = await autorizarEscritura(request, env, cors);
           if (auth.error) return auth.error;
           return await agregarLinea(env, cors, cuerpo.nombre);
         }
         if (cuerpo && cuerpo.action === "linea-borrar") {
-          const auth = await autorizar(request, env, cors);
+          const auth = await autorizarEscritura(request, env, cors);
           if (auth.error) return auth.error;
           return await borrarLinea(env, cors, cuerpo.nombre);
         }
         if (cuerpo && cuerpo.action === "usuario-agregar") {
-          const auth = await autorizar(request, env, cors);
+          const auth = await autorizarEscritura(request, env, cors);
           if (auth.error) return auth.error;
           return await agregarUsuario(env, cors, auth.user, cuerpo);
         }
         if (cuerpo && cuerpo.action === "usuario-borrar") {
-          const auth = await autorizar(request, env, cors);
+          const auth = await autorizarEscritura(request, env, cors);
           if (auth.error) return auth.error;
           return await borrarUsuario(env, cors, auth.user, cuerpo.email);
         }
-        const auth = await autorizar(request, env, cors);
+        const auth = await autorizarEscritura(request, env, cors);
         if (auth.error) return auth.error;
         return await guardar(env, cors, cuerpo);
       }

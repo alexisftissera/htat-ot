@@ -46,12 +46,14 @@
     btnUser: $("btnUser"),
     userAvatar: $("userAvatar"),
     userName: $("userName"),
+    userRole: $("userRole"),
     btnInstall: $("btnInstall"),
     modalInstall: $("modalInstall"),
     btnInstallClose: $("btnInstallClose"),
     btnInstallDone: $("btnInstallDone"),
     footCount: $("footCount"),
     offlineBanner: $("offlineBanner"),
+    lecturaBanner: $("lecturaBanner"),
     toasts: $("toasts"),
     // modales
     modalPreview: $("modalPreview"),
@@ -120,6 +122,27 @@
     histMaqFiltro: "",   // máquina seleccionada como filtro del historial
     histBusqueda: "",    // texto de búsqueda activo (se aplica solo al tocar la lupa)
   };
+
+  /* ---------- Modo de acceso ----------
+     "lectura": cualquier cuenta de Google puede VER el historial pero
+     no cargar/modificar OTs. Las cuentas de la lista permitida (y el
+     admin) son las únicas con permisos de edición. */
+  function modoLectura() { return !Auth.esEditor(); }
+
+  /* Activa/desactiva todo lo que NO debe estar disponible para quien
+     solo lee (formulario, fotos, firma, edición/borrado del historial). */
+  function actualizarModoUI() {
+    const ro = modoLectura();
+    if (els.lecturaBanner) els.lecturaBanner.hidden = !ro;
+    [els.btnSave, els.btnDownloadPdf, els.btnNewForm, els.btnCamara,
+     els.btnGaleria, els.btnClearSig].forEach((b) => { if (b) b.disabled = ro; });
+    if (els.btnDownloadPdf) els.btnDownloadPdf.title = ro
+      ? "Solo lectura: la cuenta actual no puede cargar ni modificar OTs"
+      : "";
+    /* Al quedar en modo lectura, se limpia cualquier formulario a medio
+       editar para que nadie que solo lee deje cambios locales. */
+    if (ro && state && state.editId) resetForm();
+  }
 
   /* ---------- Toasts ---------- */
   function toast(msg, kind) {
@@ -698,10 +721,12 @@
     sep.disabled = true;
     sep.textContent = "──────────";
     els.fLinea.appendChild(sep);
-    const add = document.createElement("option");
-    add.value = "__nueva__";
-    add.textContent = "+ Agregar línea…";
-    els.fLinea.appendChild(add);
+    if (Auth.esEditor()) {
+      const add = document.createElement("option");
+      add.value = "__nueva__";
+      add.textContent = "+ Agregar línea…";
+      els.fLinea.appendChild(add);
+    }
     if (todas.includes(actual)) els.fLinea.value = actual;
   }
 
@@ -1006,13 +1031,15 @@
       }
       const acts = document.createElement("div");
       acts.className = "history-item-actions";
-      const bLoad = mkActBtn("Editar", () => loadRecord(r));
       const bPdf = mkActBtn("Descargar PDF", async () => {
         const doc = await HTAT_PDF.build(r);
         doc.save(fileNameFor(r));
         toast("PDF descargado", "ok");
       });
-      acts.append(bLoad, bPdf);
+      acts.append(bPdf);
+      if (Auth.esEditor()) {
+        acts.prepend(mkActBtn("Editar", () => loadRecord(r)));
+      }
       item.append(top, p, acts);
       els.novList.appendChild(item);
     });
@@ -1147,7 +1174,6 @@
       }
       const acts = document.createElement("div");
       acts.className = "history-item-actions";
-      const bLoad = mkActBtn("Editar", () => loadRecord(r));
       const bPdf = mkActBtn("Descargar PDF", async () => {
         const doc = await HTAT_PDF.build(r);
         doc.save(fileNameFor(r));
@@ -1159,23 +1185,27 @@
         window.open(url, "_blank");
         toast("Mostrando PDF", "ok");
       });
-      const bDel = document.createElement("button");
-      bDel.type = "button";
-      bDel.className = "btn btn-danger";
-      bDel.textContent = "Eliminar";
-      bDel.addEventListener("click", async () => {
-        const msg = r.hub
-          ? "¿Eliminar la OT " + r.ot + " del historial compartido y de este dispositivo?"
-          : "¿Eliminar la OT " + r.ot + " de este dispositivo?";
-        if (!confirm(msg)) return;
-        await DB.del(r.id);
-        if (r.hub) { try { await Cloud.del(r.id); } catch (e) { console.warn(e); } }
-        await renderHistory(state.histBusqueda);
-        refreshCount();
-        toast("Registro eliminado");
-        refrescarEnVivo();
-      });
-      acts.append(bLoad, bPdf, bView, bDel);
+      acts.append(bPdf, bView);
+      if (Auth.esEditor()) {
+        const bLoad = mkActBtn("Editar", () => loadRecord(r));
+        const bDel = document.createElement("button");
+        bDel.type = "button";
+        bDel.className = "btn btn-danger";
+        bDel.textContent = "Eliminar";
+        bDel.addEventListener("click", async () => {
+          const msg = r.hub
+            ? "¿Eliminar la OT " + r.ot + " del historial compartido y de este dispositivo?"
+            : "¿Eliminar la OT " + r.ot + " de este dispositivo?";
+          if (!confirm(msg)) return;
+          await DB.del(r.id);
+          if (r.hub) { try { await Cloud.del(r.id); } catch (e) { console.warn(e); } }
+          await renderHistory(state.histBusqueda);
+          refreshCount();
+          toast("Registro eliminado");
+          refrescarEnVivo();
+        });
+        acts.append(bLoad, bDel);
+      }
       item.append(top, p, acts);
       els.histList.appendChild(item);
     };
@@ -1394,7 +1424,14 @@
     els.btnUser.hidden = false;
     els.userAvatar.textContent = inicialUsuario();
     els.userName.textContent = u.nombre || u.email || "Cuenta";
-    els.cfgInfoUsuario.textContent = u.email + (u.nombre ? " (" + u.nombre + ")" : "");
+    if (els.userRole) {
+      els.userRole.hidden = Auth.esEditor();
+      els.userRole.textContent = "solo lectura";
+    }
+    const rol = Auth.esAdmin() ? " · administrador"
+      : Auth.esEditor() ? " · edición"
+      : " · solo lectura";
+    els.cfgInfoUsuario.textContent = u.email + (u.nombre ? " (" + u.nombre + ")" : "") + rol;
   }
   els.btnUser.addEventListener("click", () => {
     els.modalConfig.hidden = false;
@@ -1404,6 +1441,23 @@
     if (!confirm("¿Cerrar la sesión actual? Para volver a usar la app tendrás que iniciar sesión con Google.")) return;
     Auth.salir();
   });
+
+  /* Pide a la base el nivel real de la cuenta (lectura/usuario/admin).
+     Si la base no responde (offline) conserva el nivel guardado de la
+     última sesión; sin dato previo queda en "lectura" (nunca se asume
+     permiso de edición sin confirmación del administrador). */
+  async function aplicarModoAcceso() {
+    try {
+      const perfil = await Cloud.quienSoy();
+      if (perfil && perfil.email) {
+        Auth.setNivel(perfil.nivel || "lectura");
+      }
+    } catch (e) {
+      /* sin conexión con la base: se mantiene el nivel guardado */
+    }
+    mostrarSesion();
+    actualizarModoUI();
+  }
 
   /* Administración de usuarios permitidos (solo visible para admins). */
   async function renderUsuariosConfig() {
@@ -1586,18 +1640,10 @@
 
     /* Puerta de acceso: sin sesión de Google la app no arranca. */
     await Auth.asegurarLogueado();
-    mostrarSesion();
 
-    /* Confirma el nivel (admin/usuario) contra la base en segundo plano. */
-    Cloud.quienSoy()
-      .then((perfil) => {
-        if (perfil) {
-          Auth.setNivel(perfil.nivel);
-          mostrarSesion();
-          if (!els.modalConfig.hidden) renderInfoConfig();
-        }
-      })
-      .catch(() => {});
+    /* Confirma el nivel (lectura/usuario/admin) contra la base y ajusta
+       la interfaz a los permisos de la cuenta. */
+    await aplicarModoAcceso();
 
     refreshCount();
     fillMaquinasDatalist();

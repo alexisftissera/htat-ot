@@ -30,6 +30,7 @@
         <button type="button" class="btn btn-ghost btn-icon" id="btnUser" title="Sesión" aria-label="Sesión" hidden>
           <span class="user-avatar" id="userAvatar">–</span>
           <span class="btn-label" id="userName">Cuenta</span>
+          <span class="user-role" id="userRole" hidden>solo lectura</span>
         </button>
         <button type="button" class="btn btn-ghost btn-icon" id="btnHistory" title="Historial de OT" aria-label="Historial de OT">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v5"/></svg>
@@ -50,6 +51,11 @@
   <main class="container">
 
     <div class="offline-banner" id="offlineBanner" hidden>Sin conexión · Los registros se guardan en el dispositivo</div>
+
+    <div class="readonly-banner" id="lecturaBanner" hidden>
+      Modo lectura: tu cuenta puede <strong>ver</strong> el historial completo,
+      pero no cargar ni modificar OTs. Para editar, pedile acceso a un administrador.
+    </div>
 
     <form id="otForm" class="ot-form" novalidate>
 
@@ -343,8 +349,8 @@
         <div class="cfg-row"><dt>Sesión</dt><dd id="cfgInfoUsuario">—</dd></div>
       </dl>
       <div id="cfgUsuariosWrap" class="cfg-users" hidden>
-        <h3>Usuarios permitidos</h3>
-        <p class="hint">Solo estas cuentas de Google pueden usar la aplicación.</p>
+        <h3>Usuarios con permiso de edición</h3>
+        <p class="hint">Estas cuentas de Google pueden cargar, modificar y borrar OTs. Cualquier otra cuenta de Google solo puede <strong>ver</strong> el historial.</p>
         <div id="cfgUsuariosList" class="users-list"></div>
         <div class="users-add">
           <input type="email" id="cfgUsuarioEmail" placeholder="correo@gmail.com" autocomplete="off" inputmode="email" />
@@ -390,7 +396,7 @@
       <div class="login-logo" aria-hidden="true">HTAT</div>
       <h1 class="login-title">Orden de Trabajo</h1>
       <p class="login-tag">Mantenimiento Predictivo y Preventivo de Planta</p>
-      <p class="login-hint" id="loginHint">Para usar la aplicación iniciá sesión con la cuenta de Google autorizada.</p>
+      <p class="login-hint" id="loginHint">Iniciá sesión con tu cuenta de Google: podrás ver el historial compartido. Para cargar o modificar OTs, tu cuenta debe estar autorizada por un administrador.</p>
       <div class="login-button" id="loginGoogleBtn"></div>
       <p class="login-loading" id="loginLoading">Cargando Google…</p>
       <p class="login-err" id="loginErr" hidden></p>

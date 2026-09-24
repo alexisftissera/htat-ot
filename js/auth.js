@@ -51,7 +51,13 @@ const Auth = (() => {
   function haySesion() { return !!(credencial && credencial.token); }
   function token() { return credencial ? (credencial.token || "") : ""; }
   function usuario() { return credencial ? credencial.perfil : null; }
-  function esAdmin() { return credencial ? credencial.nivel === "admin" : false; }
+  /* Nivel de permiso: "admin" / "usuario" (editan) o "lectura" (solo ven). */
+  function nivel() {
+    if (!credencial) return "lectura";
+    return credencial.nivel && credencial.nivel !== "null" ? credencial.nivel : "lectura";
+  }
+  function esAdmin() { return nivel() === "admin"; }
+  function esEditor() { return nivel() !== "lectura"; }
   function setNivel(nivel) {
     if (credencial) { credencial.nivel = nivel; guardar(credencial); }
   }
@@ -196,7 +202,9 @@ const Auth = (() => {
     haySesion,
     token,
     usuario,
+    nivel,
     esAdmin,
+    esEditor,
     setNivel,
     salir,
     onCambio,
