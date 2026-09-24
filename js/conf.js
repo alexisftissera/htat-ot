@@ -40,7 +40,7 @@ const CONF = {
      deploy/GUIA-GOOGLE-LOGIN.md) y es un dato PÚBLICO: va en el código
      del navegador y también en el Worker (variable GOOGLE_CLIENT_ID). */
   auth: {
-    clientId: "",               // OAuth Client ID de Google (tipo Web)
+    clientId: "411995383924-febms71tipjbsl2henioe4vkngdu0vr9.apps.googleusercontent.com",
     sessionKey: "htat.auth",    // localStorage: sesión activa (token + perfil)
   },
 
