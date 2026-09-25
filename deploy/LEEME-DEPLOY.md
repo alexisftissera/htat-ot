@@ -99,6 +99,10 @@ todo lo que no puede hacer (formulario, fotos, botones Editar/Eliminar, agregar
 líneas). Los permisos se confirman contra la base en cada inicio y en cada
 escritura (el Worker devuelve 403 si una cuenta de lectura intenta escribir).
 
+**Pantalla principal:** al entrar se abre siempre el historial de OTs. Desde
+ahí, el botón "Cargar nueva OT" (solo cuentas con edición) abre el formulario
+de carga en blanco. Las cuentas de solo lectura ven únicamente el historial.
+
 > ⚠️ **PUBLICAR la app OAuth en Google (paso obligatorio):** mientras el estado
 > sea "Prueba", Google solo deja entrar a los usuarios de prueba. Como el modelo
 > permite que **cualquier cuenta de Google vea** el historial, la app debe estar

@@ -54,6 +54,10 @@
     footCount: $("footCount"),
     offlineBanner: $("offlineBanner"),
     lecturaBanner: $("lecturaBanner"),
+    lecturaHome: $("lecturaHome"),
+    btnVerHistorial: $("btnVerHistorial"),
+    actionbar: $("actionbar"),
+    pagefoot: $("pagefoot"),
     toasts: $("toasts"),
     // modales
     modalPreview: $("modalPreview"),
@@ -66,6 +70,7 @@
     histHoy: $("histHoy"),
     histMaqTitle: $("histMaqTitle"),
     btnHistLimpiar: $("btnHistLimpiar"),
+    btnNuevaOt: $("btnNuevaOt"),
     histList: $("histList"),
     histEmpty: $("histEmpty"),
     histCount: $("histCount"),
@@ -121,6 +126,7 @@
     histOpen: false,
     histMaqFiltro: "",   // máquina seleccionada como filtro del historial
     histBusqueda: "",    // texto de búsqueda activo (se aplica solo al tocar la lupa)
+    sesionAutoAbierta: false, // el historial se abre una sola vez por carga (pantalla principal)
   };
 
   /* ---------- Modo de acceso ----------
@@ -134,8 +140,16 @@
   function actualizarModoUI() {
     const ro = modoLectura();
     if (els.lecturaBanner) els.lecturaBanner.hidden = !ro;
+    /* Quien solo lee no ve NADA del flujo de carga: ni el formulario,
+       ni la barra de acciones, ni el pie con "Nuevo registro". En su
+       lugar se muestra el panel de solo lectura con la puerta al historial. */
+    if (els.lecturaHome) els.lecturaHome.hidden = !ro;
+    if (els.form) els.form.hidden = ro;
+    if (els.actionbar) els.actionbar.hidden = ro;
+    if (els.pagefoot) els.pagefoot.hidden = ro;
     [els.btnSave, els.btnDownloadPdf, els.btnNewForm, els.btnCamara,
      els.btnGaleria, els.btnClearSig].forEach((b) => { if (b) b.disabled = ro; });
+    if (els.btnNuevaOt) els.btnNuevaOt.hidden = ro;
     if (els.btnDownloadPdf) els.btnDownloadPdf.title = ro
       ? "Solo lectura: la cuenta actual no puede cargar ni modificar OTs"
       : "";
@@ -620,7 +634,10 @@
   }
   function hasUnsavedData() {
     const v = serializeValues();
-    const keys = Object.keys(v).filter((k) => k !== "fecha" && k !== "firmaFecha" && k !== "firmaNombre");
+    /* Las unidades (energiaU/presionU) tienen valor por defecto y no
+       cuentan como "dato": solo importan junto al número. */
+    const keys = Object.keys(v).filter((k) => k !== "fecha" && k !== "firmaFecha"
+      && k !== "firmaNombre" && k !== "energiaU" && k !== "presionU");
     if (keys.some((k) => String(v[k]).trim() !== "")) return true;
     if (state.fotos.length > 0) return true;
     if (state.sigPad && !state.sigPad.isEmpty()) return true;
@@ -640,8 +657,16 @@
     await renderHistory("");
   }
   els.btnHistory.addEventListener("click", openHistory);
+  if (els.btnVerHistorial) els.btnVerHistorial.addEventListener("click", openHistory);
   els.btnHistClose.addEventListener("click", () => { els.modalHistory.hidden = true; els.histOpen = false; });
   els.modalHistory.addEventListener("click", (e) => { if (e.target === els.modalHistory) { els.modalHistory.hidden = true; els.histOpen = false; } });
+  /* "Cargar nueva OT": desde el historial (pantalla principal) se pasa a
+     un formulario nuevo. Solo visible para cuentas con edición. */
+  if (els.btnNuevaOt) els.btnNuevaOt.addEventListener("click", () => {
+    els.modalHistory.hidden = true;
+    els.histOpen = false;
+    resetForm();
+  });
   els.btnHistSearch.addEventListener("click", () => {
     state.histBusqueda = els.histSearch.value.trim();
     renderHistory(state.histBusqueda);
@@ -1457,6 +1482,12 @@
     }
     mostrarSesion();
     actualizarModoUI();
+    /* Pantalla principal: el historial. Se abre una sola vez por carga;
+       desde ahí "Cargar nueva OT" (solo edición) abre el formulario. */
+    if (!state.sesionAutoAbierta) {
+      state.sesionAutoAbierta = true;
+      openHistory().catch(() => {});
+    }
   }
 
   /* Administración de usuarios permitidos (solo visible para admins). */

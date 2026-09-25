@@ -57,6 +57,14 @@
       pero no cargar ni modificar OTs. Para editar, pedile acceso a un administrador.
     </div>
 
+    <div class="readonly-home" id="lecturaHome" hidden>
+      <div class="readonly-home-icon" aria-hidden="true">▤</div>
+      <h2 class="readonly-home-title">Solo lectura</h2>
+      <p class="readonly-home-text">Tu cuenta puede <strong>ver</strong> el historial
+        de OTs cargado, pero no puede cargar, modificar ni borrar registros.</p>
+      <button type="button" class="btn btn-primary" id="btnVerHistorial">Ver historial completo</button>
+    </div>
+
     <form id="otForm" class="ot-form" novalidate>
 
       <!-- 1 · Identificación -->
@@ -221,7 +229,7 @@
 
     </form>
 
-    <div class="actionbar" aria-label="Acciones finales">
+    <div class="actionbar" id="actionbar" aria-label="Acciones finales">
       <button type="button" class="btn btn-primary btn-lg" id="btnDownloadPdf">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 20h16"/></svg>
         Descargar PDF
@@ -232,7 +240,7 @@
       </button>
     </div>
 
-    <footer class="pagefoot">
+    <footer class="pagefoot" id="pagefoot">
       HTAT · OTs <span id="footCount">0</span> registradas · <button type="button" class="linklike" id="btnNewForm">Nuevo registro</button>
     </footer>
   </main>
@@ -253,9 +261,15 @@
     <div class="modal modal-wide">
       <div class="modal-head">
         <h2>Historial de Ordenes de Trabajo <span class="modal-count" id="histCount"></span><span class="hist-maq-title" id="histMaqTitle" hidden></span></h2>
-        <button type="button" class="btn btn-ghost btn-icon" id="btnHistClose" aria-label="Cerrar">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-        </button>
+        <div class="modal-head-actions">
+          <button type="button" class="btn btn-primary btn-sm" id="btnNuevaOt" title="Cargar una nueva OT" hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Cargar nueva OT
+          </button>
+          <button type="button" class="btn btn-ghost btn-icon" id="btnHistClose" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
       </div>
 <div class="history-toolbar">
         <div class="history-search">

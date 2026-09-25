@@ -100,6 +100,40 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: 13px;
   margin-bottom: 12px;
 }
+.readonly-home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  background: var(--card);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 34px 18px;
+  margin-bottom: 12px;
+}
+.readonly-home-icon {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--navy);
+  opacity: .7;
+}
+.readonly-home-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  color: var(--navy);
+}
+.readonly-home-text {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 400px;
+}
 .draft-status {
   font-size: 12.5px;
   color: var(--muted);
@@ -483,6 +517,16 @@ textarea { resize: vertical; min-height: 96px; }
 }
 .modal-head .btn-icon:hover { background: rgba(13, 43, 69, .07); color: var(--navy); }
 .modal-head .btn-icon svg { margin-bottom: 0; }
+.modal-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .modal-head { flex-wrap: wrap; }
+  .modal-head-actions .btn-sm { padding: 7px 10px; font-size: 12.5px; }
+}
 .modal-actions { display: flex; gap: 10px; margin-top: 14px; }
 .modal-actions-end { justify-content: flex-end; }
 .modal-photo img {
