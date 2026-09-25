@@ -1079,7 +1079,12 @@
   els.btnNovedadesClose.addEventListener("click", () => { els.modalNovedades.hidden = true; });
   els.modalNovedades.addEventListener("click", (e) => { if (e.target === els.modalNovedades) els.modalNovedades.hidden = true; });
 
-  async function renderHistory(q) {
+  /* Paginación del historial: ítems visibles por grupo (sin/con novedad). */
+  const HIST_PAGINA = 30;
+  const pagHist = { sin: HIST_PAGINA, con: HIST_PAGINA };
+
+  async function renderHistory(q, conservarPag = false) {
+    if (!conservarPag) { pagHist.sin = HIST_PAGINA; pagHist.con = HIST_PAGINA; }
     const items = await Cloud.mergedFast();
     const maq = state.histMaqFiltro;
     /* Cuando el historial está filtrado por máquina se muestra la máquina
@@ -1125,7 +1130,7 @@
     els.histCount.textContent = sorted.length;
     const conNovedad = sorted.filter((r) => r.novedad);
     const sinNovedad = sorted.filter((r) => !r.novedad);
-    const grupo = (label, lista) => {
+    const grupo = (label, lista, clave) => {
       const g = document.createElement("div");
       g.className = "history-group-head";
       const t = document.createElement("span");
@@ -1136,7 +1141,19 @@
       c.textContent = lista.length;
       g.append(t, c);
       els.histList.appendChild(g);
-      lista.forEach(pintar);
+      lista.slice(0, pagHist[clave]).forEach(pintar);
+      if (lista.length > pagHist[clave]) {
+        const restantes = lista.length - pagHist[clave];
+        const mas = document.createElement("button");
+        mas.type = "button";
+        mas.className = "btn btn-ghost btn-sm hist-mas";
+        mas.textContent = "Ver más (" + restantes + " más)";
+        mas.addEventListener("click", () => {
+          pagHist[clave] = Math.min(lista.length, pagHist[clave] + HIST_PAGINA);
+          renderHistory(state.histBusqueda, true);
+        });
+        els.histList.appendChild(mas);
+      }
     };
     const pintar = (r) => {
       const item = document.createElement("div");
@@ -1234,8 +1251,8 @@
       item.append(top, p, acts);
       els.histList.appendChild(item);
     };
-    if (sinNovedad.length) grupo("Sin novedad", sinNovedad);
-    if (conNovedad.length) grupo("Con novedad", conNovedad);
+    if (sinNovedad.length) grupo("Sin novedad", sinNovedad, "sin");
+    if (conNovedad.length) grupo("Con novedad", conNovedad, "con");
     Cloud.warm(() => {
       if (els.histOpen && Cloud.isFresh()) renderHistory(q);
     });

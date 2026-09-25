@@ -717,6 +717,13 @@ textarea { resize: vertical; min-height: 96px; }
 
 .history-item-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .history-item-actions .btn { padding: 8px 12px; font-size: 12.5px; }
+.hist-mas {
+  display: block;
+  margin: 10px auto 16px;
+  padding: 9px 22px;
+  font-size: 13px;
+  font-weight: 800;
+}
 .history-item-actions .btn-danger { margin-left: auto; }
 .synced-ok {
   color: var(--ok);
