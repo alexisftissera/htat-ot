@@ -11,10 +11,17 @@
 
 const Auth = (() => {
   const GIS_URL = "https://accounts.google.com/gsi/client";
-  let credencial = null;   // { token, perfil, nivel } o null
+  /* La sesión se mantiene viva renovando en silencio: Google One Tap
+     re-emite una credencial nueva mientras la sesión de Google del
+     navegador siga activa (dura días). Así un día de trabajo entero
+     no se corta por el vencimiento del ID token (~1 h). */
+  const RENOVAR_MS = 10 * 60 * 1000;      // renovar con 10 min de margen
+  const REVISAR_MS = 5 * 60 * 1000;       // revisión del reloj cada 5 min
+  let credencial = null;   // { token, perfil, nivel, venceEn } o null
   let resolvers = [];      // promesas esperando una sesión
   let oyentes = [];        // callbacks de cambio de sesión
   let gisPromise = null;
+  let reloj = null;        // timer de renovación silenciosa
   let leyendo = false;
 
   const $ = (id) => document.getElementById(id);
@@ -45,6 +52,19 @@ const Auth = (() => {
         foto: d.picture || "",
       };
     } catch (e) { return null; }
+  }
+
+  /* Cuándo vence el token (claim "exp", en ms). Sirve para saber con
+     qué margen hay que renovar en silencio antes de que Google lo deje
+     de aceptar (vencimiento ~1 h). */
+  function venceEnDe(token) {
+    try {
+      const p = String(token).split(".")[1];
+      const b64 = (p || "").replace(/-/g, "+").replace(/_/g, "/");
+      const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+      const json = decodeURIComponent(escape(atob(b64 + pad)));
+      return (JSON.parse(json).exp || 0) * 1000;
+    } catch (e) { return 0; }
   }
 
   /* ---------- estado de la sesión ---------- */
@@ -87,9 +107,40 @@ const Auth = (() => {
     if (!resp || !resp.credential) return;
     const perfil = perfilDeToken(resp.credential);
     if (!perfil || !perfil.email) return;
-    credencial = { token: resp.credential, perfil, nivel: null };
+    /* venceEn: cuándo deja de servir este token (~1 h), para saber
+       con cuánto margen hay que renovar en silencio. */
+    credencial = { token: resp.credential, perfil, nivel: null, venceEn: venceEnDe(resp.credential) };
     guardar(credencial);
+    encenderReloj();
     notificar();
+  }
+
+  /* ---------- renovación silenciosa (sesión de 24 h) ----------
+     El ID token de Google vence a la ~1 h, pero GIS (One Tap) re-emite
+     una credencial nueva mientras la sesión de Google del navegador
+     siga activa (dura días). El reloj revisa cada REVISAR_MS y, cuando
+     al token le queda menos de RENOVAR_MS (10 min), vuelve a llamar a
+     prompt() en silencio para renovar sin que la persona toque nada. */
+  function renovarEnSilencio() {
+    if (!haySesion()) return;
+    if (document.visibilityState === "hidden") return;   // no molestar en 2º plano
+    if (navigator.onLine === false) return;              // sin conexión no hay nada que hacer
+    const falta = credencial && credencial.venceEn ? (credencial.venceEn - Date.now()) : 0;
+    if (falta > RENOVAR_MS) return;                      // todavía hay margen
+    cargarGIS()
+      .then(() => {
+        configurarGIS();
+        try { google.accounts.id.prompt(); } catch (e) { /* no siempre permitido */ }
+      })
+      .catch(() => {});
+  }
+  function encenderReloj() {
+    if (reloj) return;                    // ya encendido: no duplicar timers
+    renovarEnSilencio();                  // primer chequeo con lo guardado
+    reloj = setInterval(renovarEnSilencio, REVISAR_MS);
+  }
+  function apagarReloj() {
+    if (reloj) { clearInterval(reloj); reloj = null; }
   }
 
   function configurarGIS() {
