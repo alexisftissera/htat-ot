@@ -1,6 +1,6 @@
 # HTAT · Orden de Trabajo
 
-> Demo: https://htat-ot.htat.workers.dev/ · Autor: Alexis Fernando Tissera (Analista de Sistemas, Instituto Cervantes 2025, Córdoba) · Stack: JavaScript, PWA, IndexedDB, Cloudflare Workers, D1, R2, jsPDF
+> Demo: https://htat-ot.htat.workers.dev/ · Estado: en desarrollo (casi listo) · Autor: Alexis Fernando Tissera (Analista de Sistemas, Instituto Cervantes 2025, Córdoba) · Stack: JavaScript, PWA, IndexedDB, Cloudflare Workers, D1, R2, jsPDF
 
 Aplicación web (PWA) para el registro de **Órdenes de Trabajo** de mantenimiento predictivo y preventivo de planta.
 
