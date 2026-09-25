@@ -171,6 +171,21 @@ wrangler secret put HTAT_ADMIN         # tu email de Google
 CORS permitido por defecto: `https://htat-ot.htat.workers.dev`,
 `http://localhost:8080` y `https://localhost:8080`.
 
+## Tests
+
+Suite con `node --test` (Node ≥ 18). Cubre el núcleo JWT y el contrato de
+la API completa con fakes en memoria (D1 y R2) y verificación de Google
+inyectada:
+
+```
+node --test tests\auth-core.test.mjs tests\api.test.mjs
+```
+
+- `auth-core.test.mjs`: JWT, base64url, claims y extracción del Bearer.
+- `api.test.mjs`: CORS, 401/403 por rol, lectura abierta, escritura de
+  editores, administración de usuarios solo-admin, validaciones y
+  subida/limpieza de fotos en R2 (28 casos).
+
 ## Sin el despliegue de la v3
 
 Si todavía no está creado/desplegado el login, la app **sigue funcionando como

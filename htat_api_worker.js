@@ -208,6 +208,16 @@ async function usuarioDeGoogle(token, env) {
   return p;
 }
 
+/* Punto de inyección para tests: si el entorno trae __verificarGoogle,
+   se usa en lugar de validar la firma contra Google (JWKS/WebCrypto).
+   Nunca se define en producción: solo los tests lo usan. */
+async function verificarGoogle(token, env) {
+  if (env && typeof env.__verificarGoogle === "function") {
+    return await env.__verificarGoogle(token);
+  }
+  return await usuarioDeGoogle(token, env);
+}
+
 /* ¿El email está en la lista de permitidos? El admin de HTAT_ADMIN
    siempre entra (fallback de emergencia si se vacía la lista). */
 async function esPermitido(env, email) {
@@ -233,7 +243,7 @@ async function autorizar(request, env, cors) {
   let user = null;
   let errorAuth = null;
   try {
-    user = await usuarioDeGoogle(m ? m[1] : "", env);
+    user = await verificarGoogle(m ? m[1] : "", env);
   } catch (e) {
     errorAuth = e.message || String(e);
   }
