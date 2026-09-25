@@ -374,12 +374,29 @@
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="btnCfgSync">Sincronizar ahora</button>
         <button type="button" class="btn btn-primary" id="btnCfgUpdate">Buscar actualización</button>
-        <button type="button" class="btn btn-danger" id="btnCfgLogout">Cerrar sesión</button>
       </div>
       <p class="hint">
         La conexión con el historial compartido es <strong>automática</strong>: no hay
         nada que configurar. Esta pantalla solo muestra el estado.
       </p>
+    </div>
+  </div>
+
+  <!-- Perfil: solo datos de la cuenta y cerrar sesión -->
+  <div class="modal-backdrop" id="modalPerfil" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Mi cuenta</h2>
+        <button type="button" class="btn btn-ghost btn-icon" id="btnPerfilClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <dl class="cfg-info">
+        <div class="cfg-row"><dt>Sesión</dt><dd id="perfilInfoUsuario">—</dd></div>
+      </dl>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger" id="btnPerfilLogout">Cerrar sesión</button>
+      </div>
     </div>
   </div>
 

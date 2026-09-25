@@ -104,7 +104,10 @@
     cfgInfoSync: $("cfgInfoSync"),
     cfgInfoVersion: $("cfgInfoVersion"),
     cfgInfoUsuario: $("cfgInfoUsuario"),
-    btnCfgLogout: $("btnCfgLogout"),
+    modalPerfil: $("modalPerfil"),
+    perfilInfoUsuario: $("perfilInfoUsuario"),
+    btnPerfilLogout: $("btnPerfilLogout"),
+    btnPerfilClose: $("btnPerfilClose"),
     cfgUsuariosWrap: $("cfgUsuariosWrap"),
     cfgUsuariosList: $("cfgUsuariosList"),
     cfgUsuarioEmail: $("cfgUsuarioEmail"),
@@ -1475,14 +1478,28 @@
       : " · solo lectura";
     els.cfgInfoUsuario.textContent = u.email + (u.nombre ? " (" + u.nombre + ")" : "") + rol;
   }
-  els.btnUser.addEventListener("click", () => {
-    els.modalConfig.hidden = false;
-    renderInfoConfig();
-  });
-  els.btnCfgLogout.addEventListener("click", () => {
+  /* Perfil: solo datos de la cuenta y cerrar sesión (Configuración
+     queda sin botón de salida). */
+  function abrirPerfil() {
+    const u = Auth.usuario();
+    if (els.perfilInfoUsuario) {
+      const rol = Auth.esAdmin() ? " · administrador"
+        : Auth.esEditor() ? " · edición"
+        : " · solo lectura";
+      els.perfilInfoUsuario.textContent = u
+        ? (u.email + (u.nombre ? " (" + u.nombre + ")" : "") + rol)
+        : "—";
+    }
+    els.modalPerfil.hidden = false;
+  }
+  function cerrarSesion() {
     if (!confirm("¿Cerrar la sesión actual? Para volver a usar la app tendrás que iniciar sesión con Google.")) return;
     Auth.salir();
-  });
+  }
+  els.btnUser.addEventListener("click", abrirPerfil);
+  els.btnPerfilClose.addEventListener("click", () => { els.modalPerfil.hidden = true; });
+  els.modalPerfil.addEventListener("click", (e) => { if (e.target === els.modalPerfil) els.modalPerfil.hidden = true; });
+  els.btnPerfilLogout.addEventListener("click", cerrarSesion);
 
   /* Pide a la base el nivel real de la cuenta (lectura/usuario/admin).
      Si la base no responde (offline) conserva el nivel guardado de la
@@ -1636,6 +1653,7 @@
     const visibles = [
       els.modalHistory, els.modalConfig, els.modalInstall,
       els.modalNovedades, els.modalMaquinas, els.modalResumen, els.modalPreview,
+      els.modalPerfil,
     ];
     for (const m of visibles) { if (m && !m.hidden) return m; }
     return null;
@@ -1646,7 +1664,7 @@
   }
   const observadorModales = new MutationObserver(actualizarBloqueoScroll);
   [els.modalHistory, els.modalConfig, els.modalInstall, els.modalNovedades,
-    els.modalMaquinas, els.modalResumen, els.modalPreview].forEach((m) => {
+    els.modalMaquinas, els.modalResumen, els.modalPreview, els.modalPerfil].forEach((m) => {
     if (m) observadorModales.observe(m, { attributes: true, attributeFilter: ["hidden"] });
   });
   window.addEventListener("popstate", () => {
