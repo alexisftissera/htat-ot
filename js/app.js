@@ -1060,8 +1060,16 @@
       const fec = Fmt.pretty(r.fechaEmision || r.creadoEn, false);
       const editada = r.actualizadoEn && r.creadoEn && r.actualizadoEn !== r.creadoEn;
       const hora = Fmt.hora(r.actualizadoEn || r.creadoEn);
-      meta.textContent = fec + (hora ? " · " + hora : "") + (editada ? " · editada" : "") + (r.autor ? " · " + r.autor : "");
-      top.append(otNo, nov, act, meta);
+      meta.textContent = fec + (hora ? " · " + hora : "") + (editada ? " · editada" : "");
+      top.append(otNo, nov, act);
+      if (r.autor) {
+        const aut = document.createElement("span");
+        aut.className = "ot-autor";
+        aut.textContent = r.autor;
+        aut.title = "Registró esta OT";
+        top.append(aut);
+      }
+      top.append(meta);
       const p = document.createElement("p");
       p.className = "ot-desc";
       if (r.tipoPlan) {
@@ -1141,6 +1149,7 @@
         r.activo,
         r.linea,
         r.tipoPlan,
+        r.autor,
         Fmt.pretty(iso, false),
         iso,
         fechas.join(" "),
@@ -1213,7 +1222,7 @@
       const fechaTrabajo = Fmt.pretty(r.fechaEmision || r.creadoEn, false);
       const editada = r.actualizadoEn && r.creadoEn && r.actualizadoEn !== r.creadoEn;
       const horaReg = Fmt.hora(r.actualizadoEn || r.creadoEn);
-      meta.textContent = fechaTrabajo + (horaReg ? " · " + horaReg : "") + (editada ? " · editada" : "") + (r.autor ? " · " + r.autor : "");
+      meta.textContent = fechaTrabajo + (horaReg ? " · " + horaReg : "") + (editada ? " · editada" : "");
       const syn = document.createElement("span");
       syn.className = r.sincronizado ? "synced-ok" : "synced-no";
       syn.textContent = r.sincronizado ? "✓ compartido" : "pendiente de subir";
@@ -1227,7 +1236,15 @@
         nov.textContent = "NOVEDAD";
         top.append(nov);
       }
-      top.append(act, meta, syn);
+      top.append(act);
+      if (r.autor) {
+        const aut = document.createElement("span");
+        aut.className = "ot-autor";
+        aut.textContent = r.autor;
+        aut.title = "Registró esta OT";
+        top.append(aut);
+      }
+      top.append(meta, syn);
       const p = document.createElement("p");
       p.className = "ot-desc";
       if (r.tipoPlan) {
