@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS ots (
   firmaFecha        TEXT,
   creadoEn          TEXT,
   actualizadoEn     TEXT,
+  autor             TEXT,
   foto1             TEXT,
   foto2             TEXT,
   foto3             TEXT,

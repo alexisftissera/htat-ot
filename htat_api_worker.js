@@ -55,7 +55,7 @@ import {
 const COLUMNAS = [
   "id", "ot", "fechaEmision", "linea", "activo", "tipoPlan", "parteSistema",
   "tareaEspecifica", "consumoEnergia", "presionGas", "observaciones",
-  "firmaNombre", "firmaFecha", "creadoEn", "actualizadoEn",
+  "firmaNombre", "firmaFecha", "creadoEn", "actualizadoEn", "autor",
   "foto1", "foto2", "foto3", "foto4", "foto5",
   "foto6", "foto7", "foto8", "foto9", "firmaImg", "novedad",
 ];

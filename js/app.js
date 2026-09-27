@@ -78,6 +78,7 @@
     btnNovedades: $("btnNovedades"),
     modalNovedades: $("modalNovedades"),
     novList: $("novList"),
+    novLinea: $("novLinea"),
     novEmpty: $("novEmpty"),
     novCount: $("novCount"),
     btnNovedadesClose: $("btnNovedadesClose"),
@@ -115,6 +116,8 @@
     cfgUsuarioEmail: $("cfgUsuarioEmail"),
     btnCfgUsuarioAdd: $("btnCfgUsuarioAdd"),
     btnCfgSync: $("btnCfgSync"),
+    btnCfgExportCsv: $("btnCfgExportCsv"),
+    btnCfgExportJson: $("btnCfgExportJson"),
     btnCfgUpdate: $("btnCfgUpdate"),
     btnCfgClose: $("btnCfgClose"),
   };
@@ -506,6 +509,10 @@
       rec.creadoEn = existing.creadoEn || undefined;
       rec.sincronizadoEn = existing.sincronizadoEn || undefined;
     }
+    /* Autor: quién cargó la OT. Al editar se conserva el original. */
+    const sesion = Auth.usuario();
+    rec.autor = (existing && existing.autor) || rec.autor ||
+      ((sesion && sesion.email) || "");
     rec.sincronizado = false;   // queda pendiente de subir en segundo plano
     await DB.put(rec);
   }
@@ -1012,8 +1019,26 @@
   /* ---------- Novedades ---------- */
   async function renderNovedades() {
     const items = await Cloud.mergedFast();
+    /* Filtro por línea (opciones desde todos los registros) */
+    const lineasNov = [...new Set(items.map((r) => (r.linea || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const novLinSel = els.novLinea ? els.novLinea.value : "";
+    if (els.novLinea) {
+      els.novLinea.innerHTML = "";
+      const optTodas = document.createElement("option");
+      optTodas.value = "";
+      optTodas.textContent = "Todas las líneas";
+      els.novLinea.appendChild(optTodas);
+      lineasNov.forEach((l) => {
+        const o = document.createElement("option");
+        o.value = l;
+        o.textContent = l;
+        els.novLinea.appendChild(o);
+      });
+      els.novLinea.value = lineasNov.includes(novLinSel) ? novLinSel : "";
+    }
+    const fNovLin = els.novLinea ? els.novLinea.value : "";
     const con = items
-      .filter((r) => r.novedad)
+      .filter((r) => r.novedad && (!fNovLin || (r.linea || "").trim() === fNovLin))
       .sort((a, b) => (b.fechaEmision || b.creadoEn || "").localeCompare(a.fechaEmision || a.creadoEn || ""));
     els.novList.innerHTML = "";
     els.novEmpty.hidden = con.length > 0;
@@ -1037,7 +1062,7 @@
       const fec = Fmt.pretty(r.fechaEmision || r.creadoEn, false);
       const editada = r.actualizadoEn && r.creadoEn && r.actualizadoEn !== r.creadoEn;
       const hora = Fmt.hora(r.actualizadoEn || r.creadoEn);
-      meta.textContent = fec + (hora ? " · " + hora : "") + (editada ? " · editada" : "");
+      meta.textContent = fec + (hora ? " · " + hora : "") + (editada ? " · editada" : "") + (r.autor ? " · " + r.autor : "");
       top.append(otNo, nov, act, meta);
       const p = document.createElement("p");
       p.className = "ot-desc";
@@ -1077,6 +1102,7 @@
       if (!els.modalNovedades.hidden && Cloud.isFresh()) renderNovedades();
     });
   }
+  if (els.novLinea) els.novLinea.addEventListener("change", renderNovedades);
   els.btnNovedades.addEventListener("click", async () => {
     els.modalNovedades.hidden = false;
     await renderNovedades();
@@ -1132,6 +1158,11 @@
       .sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || ""));
     els.histList.innerHTML = "";
     els.histEmpty.hidden = sorted.length > 0;
+    if (!sorted.length) {
+      els.histEmpty.textContent = items.length === 0
+        ? "Sin OTs registradas todavía. Cuando se cargue la primera, aparecerá acá."
+        : "No hay registros que coincidan con los filtros. Si está activado \"Solo hoy\", pruebe a desactivarlo o busque por máquina.";
+    }
     els.histCount.textContent = sorted.length;
     const conNovedad = sorted.filter((r) => r.novedad);
     const sinNovedad = sorted.filter((r) => !r.novedad);
@@ -1184,10 +1215,10 @@
       const fechaTrabajo = Fmt.pretty(r.fechaEmision || r.creadoEn, false);
       const editada = r.actualizadoEn && r.creadoEn && r.actualizadoEn !== r.creadoEn;
       const horaReg = Fmt.hora(r.actualizadoEn || r.creadoEn);
-      meta.textContent = fechaTrabajo + (horaReg ? " · " + horaReg : "") + (editada ? " · editada" : "");
+      meta.textContent = fechaTrabajo + (horaReg ? " · " + horaReg : "") + (editada ? " · editada" : "") + (r.autor ? " · " + r.autor : "");
       const syn = document.createElement("span");
       syn.className = r.sincronizado ? "synced-ok" : "synced-no";
-      syn.textContent = r.sincronizado ? "✓ compartido" : "solo local";
+      syn.textContent = r.sincronizado ? "✓ compartido" : "pendiente de subir";
       syn.title = r.sincronizado
         ? "Visible para todas las personas en la base compartida"
         : "Todavía no se subió: solo está en este equipo";
@@ -1327,6 +1358,71 @@
     els.modalConfig.hidden = false;
     actualizarBadgeCloud(true);
     renderInfoConfig();
+  });
+  /* ---------- Respaldo: exportar historial a CSV/JSON ---------- */
+  function descargarArchivo(nombre, contenido, tipo) {
+    const blob = new Blob([contenido], { type: tipo + ";charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+  function filaRespaldo(r) {
+    const met = (m) => (m && typeof m === "object"
+      ? [m.valor || "", m.unidad || ""].join(" ").trim()
+      : (m === undefined || m === null ? "" : String(m)));
+    return {
+      id: r.id || "",
+      ot: r.ot || "",
+      fechaEmision: r.fechaEmision || "",
+      linea: r.linea || "",
+      activo: r.activo || "",
+      tipoPlan: r.tipoPlan || "",
+      parteSistema: r.parteSistema || "",
+      tareaEspecifica: r.tareaEspecifica || "",
+      consumoEnergia: met(r.consumoEnergia),
+      presionGas: met(r.presionGas),
+      observaciones: r.observaciones || "",
+      firmaNombre: r.firmaNombre || (r.firma && r.firma.nombre) || "",
+      firmaFecha: r.firmaFecha || (r.firma && r.firma.fecha) || "",
+      autor: r.autor || "",
+      novedad: r.novedad ? 1 : 0,
+      creadoEn: r.creadoEn || "",
+      actualizadoEn: r.actualizadoEn || "",
+    };
+  }
+  function nombreRespaldo(ext) {
+    const d = new Date();
+    const f = d.getFullYear() +
+      String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+    return "HTAT-historial-" + f + "." + ext;
+  }
+  els.btnCfgExportCsv.addEventListener("click", async () => {
+    try {
+      const filas = (await Cloud.mergedAll()).map(filaRespaldo);
+      const cols = Object.keys(filas.length ? filas[0] : filaRespaldo({}));
+      const esc = (v) => "\"" + String(v).replace(/"/g, "\"\"") + "\"";
+      const csv = [cols.join(",")]
+        .concat(filas.map((f) => cols.map((c) => esc(f[c])).join(",")))
+        .join("\r\n");
+      descargarArchivo(nombreRespaldo("csv"), "\uFEFF" + csv, "text/csv");
+      toast("Respaldo CSV descargado (" + filas.length + " OTs)", "ok");
+    } catch (e) {
+      toast("No se pudo exportar: " + (e.message || e), "err");
+    }
+  });
+  els.btnCfgExportJson.addEventListener("click", async () => {
+    try {
+      const filas = (await Cloud.mergedAll()).map(filaRespaldo);
+      descargarArchivo(nombreRespaldo("json"), JSON.stringify(filas, null, 2), "application/json");
+      toast("Respaldo JSON descargado (" + filas.length + " OTs)", "ok");
+    } catch (e) {
+      toast("No se pudo exportar: " + (e.message || e), "err");
+    }
   });
   els.btnCfgClose.addEventListener("click", () => { els.modalConfig.hidden = true; });
   els.modalConfig.addEventListener("click", (e) => { if (e.target === els.modalConfig) els.modalConfig.hidden = true; });

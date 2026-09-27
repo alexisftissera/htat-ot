@@ -73,6 +73,7 @@ const Cloud = (() => {
       firmaFecha: (rec.firma && rec.firma.fecha) || "",
       creadoEn: rec.creadoEn || new Date().toISOString(),
       actualizadoEn: rec.actualizadoEn || new Date().toISOString(),
+      autor: rec.autor || "",
     };
   }
 
@@ -106,6 +107,7 @@ const Cloud = (() => {
         : null,
       creadoEn: row.creadoEn || "",
       actualizadoEn: row.actualizadoEn || "",
+      autor: row.autor || "",
       hub: true,
       sincronizado: true,   // vino de la base: ya está compartido entre todos
     };

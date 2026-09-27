@@ -191,6 +191,9 @@ const HTAT_PDF = (() => {
     y = row2(doc, y, "Activo / Máquina", record.activo || "", "Novedad", record.novedad ? "CON NOVEDAD" : "SIN NOVEDAD");
     ensure(10);
     y += 5;
+    y = rowFull(doc, y, "Registrado por", record.autor || "");
+    ensure(10);
+    y += 5;
     if (record.novedad) {
       ensure(22);
       fill(doc, C.alertaFondo);

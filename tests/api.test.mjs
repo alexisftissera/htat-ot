@@ -17,7 +17,7 @@ import worker from "../htat_api_worker.js";
 const COLUMNAS = [
   "id", "ot", "fechaEmision", "linea", "activo", "tipoPlan", "parteSistema",
   "tareaEspecifica", "consumoEnergia", "presionGas", "observaciones",
-  "firmaNombre", "firmaFecha", "creadoEn", "actualizadoEn",
+  "firmaNombre", "firmaFecha", "creadoEn", "actualizadoEn", "autor",
   "foto1", "foto2", "foto3", "foto4", "foto5",
   "foto6", "foto7", "foto8", "foto9", "firmaImg", "novedad",
 ];
@@ -305,6 +305,17 @@ test("POST guardar OT con editor guarda y aparece en GET /", async () => {
   assert.ok(ot, "la OT guardada aparece en la lista");
   assert.equal(ot.ot, "999");
   assert.equal(ot.activo, "COMPRESORA C-101");
+});
+
+test("POST guardar OT con autor lo conserva y aparece en GET /", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  const r = await worker.fetch(peticion("/", { token: "token-editor", body: { ...OT_BASE, autor: "hector@ejemplo.com" } }), env);
+  assert.equal(r.status, 200);
+  assert.equal(await r.text(), "OK");
+  const lista = await cuerpo(await worker.fetch(peticion("/", { token: "token-lector" }), env));
+  const ot = lista.find((x) => x.id === "ot-1");
+  assert.ok(ot, "la OT guardada aparece en la lista");
+  assert.equal(ot.autor, "hector@ejemplo.com");
 });
 
 test("POST delete con editor elimina la OT", async () => {

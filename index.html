@@ -337,6 +337,9 @@
         </button>
       </div>
       <p class="hint">Son las OTs marcadas como <strong>con novedad</strong>. Para cerrar una novedad: edite la OT, cambie a <strong>Sin novedad</strong> y guárdela; dejará de aparecer acá.</p>
+      <div class="history-toolbar-row">
+        <select id="novLinea" title="Filtrar por línea" aria-label="Filtrar por línea"></select>
+      </div>
       <div id="novList" class="history-list"></div>
       <div class="empty-state" id="novEmpty" hidden>No hay OTs con novedad. Cuando una intervención deje novedad pendiente, quedará listada acá.</div>
     </div>
@@ -373,6 +376,8 @@
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="btnCfgSync">Sincronizar ahora</button>
+        <button type="button" class="btn btn-secondary" id="btnCfgExportCsv">Exportar CSV</button>
+        <button type="button" class="btn btn-secondary" id="btnCfgExportJson">Exportar JSON</button>
         <button type="button" class="btn btn-primary" id="btnCfgUpdate">Buscar actualización</button>
       </div>
       <p class="hint">
