@@ -601,6 +601,11 @@ textarea { resize: vertical; min-height: 96px; }
 .history-toolbar-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .btn-novedades { border-color: rgba(195, 48, 48, .35); color: var(--err); }
 .btn-novedades:hover { border-color: var(--err); background: rgba(195, 48, 48, .08); }
+@media (max-width: 480px) {
+  .history-toolbar-row .chk-hoy { flex: 1 1 100%; justify-content: center; }
+  .history-toolbar-actions { flex: 1 1 100%; margin-left: 0; }
+  .history-toolbar-actions .btn { flex: 1 1 100%; }
+}
 .modal-count {
   display: inline-block;
   background: var(--bg);
