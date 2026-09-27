@@ -115,10 +115,8 @@
     cfgUsuariosList: $("cfgUsuariosList"),
     cfgUsuarioEmail: $("cfgUsuarioEmail"),
     btnCfgUsuarioAdd: $("btnCfgUsuarioAdd"),
-    btnCfgSync: $("btnCfgSync"),
     btnCfgExportCsv: $("btnCfgExportCsv"),
     btnCfgExportJson: $("btnCfgExportJson"),
-    btnCfgUpdate: $("btnCfgUpdate"),
     btnCfgClose: $("btnCfgClose"),
   };
 
@@ -1426,30 +1424,6 @@
   });
   els.btnCfgClose.addEventListener("click", () => { els.modalConfig.hidden = true; });
   els.modalConfig.addEventListener("click", (e) => { if (e.target === els.modalConfig) els.modalConfig.hidden = true; });
-
-  els.btnCfgSync.addEventListener("click", async () => {
-    setBusy(els.btnCfgSync, true);
-    try {
-      await Cloud.pullAll(true).catch(() => []);
-      await sincronizarPendientes();
-      if (els.histOpen) await renderHistory(state.histBusqueda);
-      toast("Historial actualizado", "ok");
-    } catch (e) {
-      toast("Sin conexión con la base", "err");
-    } finally {
-      setBusy(els.btnCfgSync, false);
-      renderInfoConfig();
-    }
-  });
-
-  els.btnCfgUpdate.addEventListener("click", async () => {
-    setBusy(els.btnCfgUpdate, true);
-    try {
-      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
-      if (reg && reg.update) await reg.update();
-    } catch (e) { /* sin service worker: recarga igual */ }
-    location.reload();
-  });
 
   /* Cartel de conexión con la base compartida. Con conPrueba=true
      verifica la conexión automáticamente y muestra el resultado. */
