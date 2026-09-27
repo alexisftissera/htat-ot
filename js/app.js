@@ -108,6 +108,8 @@
     perfilInfoUsuario: $("perfilInfoUsuario"),
     btnPerfilLogout: $("btnPerfilLogout"),
     btnPerfilClose: $("btnPerfilClose"),
+    modalBienvenida: $("modalBienvenida"),
+    btnBienvenidaOk: $("btnBienvenidaOk"),
     cfgUsuariosWrap: $("cfgUsuariosWrap"),
     cfgUsuariosList: $("cfgUsuariosList"),
     cfgUsuarioEmail: $("cfgUsuarioEmail"),
@@ -1500,6 +1502,27 @@
   els.btnPerfilClose.addEventListener("click", () => { els.modalPerfil.hidden = true; });
   els.modalPerfil.addEventListener("click", (e) => { if (e.target === els.modalPerfil) els.modalPerfil.hidden = true; });
   els.btnPerfilLogout.addEventListener("click", cerrarSesion);
+  /* Aviso único al crear la cuenta (primer inicio con Google): la cuenta
+     nace en lectura; la edición la otorga el administrador. */
+  function avisarCuentaNueva() {
+    if (Auth.esEditor()) return;
+    let clave = "htat.bienvenida";
+    try {
+      if (CONF.storage && CONF.storage.bienvenidaKey) clave = CONF.storage.bienvenidaKey;
+    } catch (e) {}
+    let visto = false;
+    try { visto = localStorage.getItem(clave) === "1"; } catch (e) {}
+    if (visto || !els.modalBienvenida) return;
+    els.modalBienvenida.hidden = false;
+  }
+  els.btnBienvenidaOk.addEventListener("click", () => {
+    let clave = "htat.bienvenida";
+    try {
+      if (CONF.storage && CONF.storage.bienvenidaKey) clave = CONF.storage.bienvenidaKey;
+    } catch (e) {}
+    try { localStorage.setItem(clave, "1"); } catch (e) {}
+    els.modalBienvenida.hidden = true;
+  });
 
   /* Pide a la base el nivel real de la cuenta (lectura/usuario/admin).
      Si la base no responde (offline) conserva el nivel guardado de la
@@ -1516,6 +1539,7 @@
     }
     mostrarSesion();
     actualizarModoUI();
+    avisarCuentaNueva();
     /* Pantalla principal: el historial. Se abre una sola vez por carga;
        desde ahí "Cargar nueva OT" (solo edición) abre el formulario. */
     if (!state.sesionAutoAbierta) {
@@ -1653,7 +1677,7 @@
     const visibles = [
       els.modalHistory, els.modalConfig, els.modalInstall,
       els.modalNovedades, els.modalMaquinas, els.modalResumen, els.modalPreview,
-      els.modalPerfil,
+      els.modalPerfil, els.modalBienvenida,
     ];
     for (const m of visibles) { if (m && !m.hidden) return m; }
     return null;
@@ -1664,7 +1688,8 @@
   }
   const observadorModales = new MutationObserver(actualizarBloqueoScroll);
   [els.modalHistory, els.modalConfig, els.modalInstall, els.modalNovedades,
-    els.modalMaquinas, els.modalResumen, els.modalPreview, els.modalPerfil].forEach((m) => {
+    els.modalMaquinas, els.modalResumen, els.modalPreview, els.modalPerfil,
+    els.modalBienvenida].forEach((m) => {
     if (m) observadorModales.observe(m, { attributes: true, attributeFilter: ["hidden"] });
   });
   window.addEventListener("popstate", () => {

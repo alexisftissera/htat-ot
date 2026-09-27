@@ -15,6 +15,7 @@ const CONF = {
     draftKey:  "htat.draft",    // localStorage: borrador del formulario activo
     countKey:  "htat.count",    // localStorage: contador de piezas guardadas
     machinesKey: "htat.machines", // localStorage: números de máquina registrados
+    bienvenidaKey: "htat.bienvenida", // localStorage: aviso de cuenta creada ya mostrado
     configVersion: 2,           // versión de la configuración guardada
   },
 
