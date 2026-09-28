@@ -1,49 +1,48 @@
 # HTAT · Orden de Trabajo
 
-> Demo: https://htat-ot.htat.workers.dev/ · Estado: en desarrollo (casi listo) · Autor: Alexis Fernando Tissera (Analista de Sistemas, Instituto Cervantes 2025, Córdoba) · Stack: JavaScript, PWA, IndexedDB, Cloudflare Workers, D1, R2, jsPDF
+Aplicación web instalable (PWA) para el registro de **Órdenes de Trabajo** de mantenimiento predictivo y preventivo de planta.
 
-Aplicación web (PWA) para el registro de **Órdenes de Trabajo** de mantenimiento predictivo y preventivo de planta.
+> **Uso:** https://htat-ot.htat.workers.dev/ · Autor: Alexis Fernando Tissera · Stack: JavaScript, PWA, IndexedDB, Cloudflare Workers, D1, R2, jsPDF
 
 ## Funcionalidades
 
 - Formulario de OT en 7 secciones: identificación, tipo de plan/tareas, métricas operativas (consumo de energía y presión de gas), novedad de máquina, observaciones, evidencia fotográfica (hasta 9 fotos) y firma digital.
-- Generación de **PDF** del reporte (A4, con membrete, métricas, fotos y firma).
-- **Almacenamiento local** en IndexedDB: funciona sin conexión; las OTs quedan pendientes de sincronizar.
-- **Historial compartido** en la nube (Cloudflare Workers + D1 + R2): las OTs se sincronizan automáticamente entre todos los dispositivos autorizados.
-- Vista de Historial con filtros (solo hoy, búsqueda, por máquina), Máquinas registradas, Máquinas por mes y OTs con Novedad.
-- Instalable como aplicación (PWA) con service worker para modo offline.
+- Reporte **PDF** en A4 con membrete, métricas, fotos, firma y quién registró/editó la OT.
+- Funciona **sin conexión**: las OTs se guardan en el equipo y se suben solas al volver la red (chip "pendiente de subir").
+- **Historial compartido** entre todos los dispositivos: filtros (solo hoy, búsqueda, por máquina, por línea en Novedades), Máquinas registradas, Máquinas por mes y OTs con Novedad.
+- **Respaldo** del historial en Excel (CSV) y datos (JSON) desde Configuración.
+- Sesión de Google de 24 h con renovación silenciosa.
 
-## Arquitectura
+## Acceso y roles
 
-```
-htat-ot (frontend, este repo)
-  └── llama a htat-api (Cloudflare Worker + D1 + R2) para el historial compartido
-```
+Acceso con cuenta de Google (sin contraseñas):
 
-## Despliegue
+| Rol | Quién | Puede |
+|---|---|---|
+| **Lectura** | Cualquier cuenta de Google (se crea sola al entrar) | Ver el historial completo |
+| **Edición** | Cuentas autorizadas por el administrador | Cargar, modificar y borrar OTs |
+| **Admin** | Administrador principal | Todo + gestionar usuarios desde Configuración |
 
-Frontend publicado en Cloudflare Workers. El historial compartido se conecta por defecto a la base del taller definida en `js/conf.js` (`CONF.cloud`).
-
-La API del historial vive en el repo: `htat_api_worker.js` (Worker `htat-api`) y
-`htat_api_schema.sql` (esquema D1). La carpeta `deploy/` tiene migraciones y la
-guía de despliegue — ver `deploy/LEEME-DEPLOY.md` (allí está documentado el fix
-de las fotos 5 → 9).
+Cada OT guarda quién la registró y quién la editó por última vez.
 
 ## Estructura
 
 ```
-index.html          Página principal (formulario de OT)
+index.html          Página principal
 manifest.json       Configuración PWA
 sw.js               Service worker (offline)
 css/styles.css      Estilos
-js/                 Lógica (conf, store, signature, photos, pdf, cloud, app)
+js/                 Lógica (conf, store, signature, photos, pdf, auth, cloud, app)
 lib/                Librerías (jsPDF)
-htat_api_worker.js  API del historial compartido (Cloudflare Worker)
-htat_api_schema.sql Esquema D1 (base nueva)
+tests/              Suite de tests (node --test)
+htat_api_worker.js  API del historial (Worker htat-api: D1 + R2)
+auth-core.mjs       Núcleo de autenticación (compartido Worker/tests)
+htat_api_schema.sql Esquema D1 para bases nuevas
 deploy/             Migraciones D1 y guía de despliegue
 assets/             Íconos
 ```
 
-## Seguridad
+## Desarrollo y despliegue
 
-Acceso con login de Google obligatorio (desde v3). Ver `SEGURIDAD-PLAN.md`. No compartir la URL fuera del personal.
+- Tests: `node --test tests/api.test.mjs tests/auth-core.test.mjs` (46 casos).
+- Despliegue: ver `deploy/LEEME-DEPLOY.md` (frontend `htat-ot` por wrangler assets, API `htat-api` con D1+R2).
