@@ -4,6 +4,11 @@ Aplicación web instalable (PWA) para el registro de **Órdenes de Trabajo** de 
 
 > **Uso:** https://htat-ot.htat.workers.dev/ · Autor: Alexis Fernando Tissera · Stack: JavaScript, PWA, IndexedDB, Cloudflare Workers, D1, R2, jsPDF
 
+## Capturas
+
+![Formulario de OT](docs/img/test-formulario.png)
+![Historial compartido](docs/img/test-historial.png)
+
 ## Funcionalidades
 
 - Formulario de OT en 7 secciones: identificación, tipo de plan/tareas, métricas operativas (consumo de energía y presión de gas), novedad de máquina, observaciones, evidencia fotográfica (hasta 9 fotos) y firma digital.
