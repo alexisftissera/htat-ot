@@ -498,6 +498,9 @@
       actualizadoEn: now,
       creadoEn: now,
     };
+    /* Quién la editó por última vez (en creación coincide con el autor). */
+    const sesionActual = Auth.usuario();
+    rec.editadoPor = (sesionActual && sesionActual.email) || "";
     return rec;
   }
 
@@ -1090,6 +1093,12 @@
         t.textContent = r.tareaEspecifica;
         p.appendChild(t);
       }
+      if (r.editadoPor && r.editadoPor !== r.autor) {
+        const e = document.createElement("span");
+        e.className = "ot-desc-muted";
+        e.textContent = "Editada por " + r.editadoPor;
+        p.appendChild(e);
+      }
       const acts = document.createElement("div");
       acts.className = "history-item-actions";
       const bPdf = mkActBtn("Descargar PDF", async () => {
@@ -1265,6 +1274,12 @@
         t.textContent = r.tareaEspecifica;
         p.appendChild(t);
       }
+      if (r.editadoPor && r.editadoPor !== r.autor) {
+        const e = document.createElement("span");
+        e.className = "ot-desc-muted";
+        e.textContent = "Editada por " + r.editadoPor;
+        p.appendChild(e);
+      }
       const acts = document.createElement("div");
       acts.className = "history-item-actions";
       const bPdf = mkActBtn("Descargar PDF", async () => {
@@ -1405,6 +1420,7 @@
       firmaNombre: r.firmaNombre || (r.firma && r.firma.nombre) || "",
       firmaFecha: r.firmaFecha || (r.firma && r.firma.fecha) || "",
       autor: r.autor || "",
+      editadoPor: r.editadoPor || "",
       novedad: r.novedad ? 1 : 0,
       creadoEn: r.creadoEn || "",
       actualizadoEn: r.actualizadoEn || "",

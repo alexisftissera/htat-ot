@@ -74,6 +74,7 @@ const Cloud = (() => {
       creadoEn: rec.creadoEn || new Date().toISOString(),
       actualizadoEn: rec.actualizadoEn || new Date().toISOString(),
       autor: rec.autor || "",
+      editadoPor: rec.editadoPor || "",
     };
   }
 
@@ -108,6 +109,7 @@ const Cloud = (() => {
       creadoEn: row.creadoEn || "",
       actualizadoEn: row.actualizadoEn || "",
       autor: row.autor || "",
+      editadoPor: row.editadoPor || "",
       hub: true,
       sincronizado: true,   // vino de la base: ya está compartido entre todos
     };

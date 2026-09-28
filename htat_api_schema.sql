@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS ots (
   creadoEn          TEXT,
   actualizadoEn     TEXT,
   autor             TEXT,
+  editadoPor        TEXT,
   foto1             TEXT,
   foto2             TEXT,
   foto3             TEXT,
