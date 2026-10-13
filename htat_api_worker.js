@@ -21,6 +21,7 @@
      POST /  {action:"linea-borrar", nombre}         -> "OK"  [ídem]
      POST /  {action:"usuario-agregar", email}       -> "OK" (solo admin)
      POST /  {action:"usuario-borrar", email}        -> "OK" (solo admin)
+     Exceso de ritmo por IP                              -> 429
 
    Autenticación: el cliente manda "Authorization: Bearer <id_token>"
    (token de Google). El Worker valida la firma RSA contra las claves
@@ -91,20 +92,26 @@ function cabecerasCORS(request, env) {
   };
 }
 
+/* Cabeceras de seguridad en toda respuesta de la API (no rompen CORS). */
+const CABECERAS_SEG = {
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+};
+
 function json(datos, cors) {
   return new Response(JSON.stringify(datos), {
-    headers: { "Content-Type": "application/json; charset=utf-8", ...cors },
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CABECERAS_SEG, ...cors },
   });
 }
 function texto(s, cors) {
   return new Response(s, {
-    headers: { "Content-Type": "text/plain; charset=utf-8", ...cors },
+    headers: { "Content-Type": "text/plain; charset=utf-8", ...CABECERAS_SEG, ...cors },
   });
 }
-function respuesta(status, cors, detalle) {
+function respuesta(status, cors, detalle, extra) {
   return new Response(detalle ? JSON.stringify(detalle) : null, {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", ...cors },
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CABECERAS_SEG, ...cors, ...(extra || {}) },
   });
 }
 
@@ -131,6 +138,69 @@ function extDe(mime) {
   if (mime && mime.indexOf("jpeg") >= 0) return "jpg";
   if (mime && mime.indexOf("webp") >= 0) return "webp";
   return "png";
+}
+
+/* ================================================================
+   LÍMITES Y VALIDACIÓN
+   ================================================================ */
+
+/* Una OT identifica y guarda sus evidencias, así que el id no puede ser
+   cualquier texto: solo letras, números, guion y guion bajo (es lo que
+   genera la app, ej. "htat-1699999999999-ab12c"). Evita que un id con
+   ".." o "/" llegue a formar claves del bucket. */
+function idValido(id) {
+  return /^[A-Za-z0-9_-]{1,64}$/.test(String(id || ""));
+}
+
+/* Claves que el endpoint de imágenes acepta: sólo las que genera la app
+   (fotos/<id>/<n>.<ext> y firmas/<id>.<ext>). Así el endpoint no sirve
+   para leer cualquier otra clave del bucket. */
+function claveValida(clave) {
+  return /^(fotos\/[A-Za-z0-9_-]{1,64}\/[1-9]\.(jpg|jpeg|png|webp)|firmas\/[A-Za-z0-9_-]{1,64}\.(jpg|jpeg|png|webp))$/.test(String(clave || ""));
+}
+
+/* Texto corto: topes generosos para el uso real (observaciones largas,
+   descripciones de tareas) pero impiden meter megabytes por fila. */
+const MAX_TEXTO = 4000;
+function textoCorto(v, max = MAX_TEXTO) {
+  const s = v === undefined || v === null ? "" : String(v);
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+/* Techo del cuerpo de un POST (una OT con 9 fotos ronda 12 MB). */
+const MAX_CUERPO = 25 * 1024 * 1024;
+
+/* ---------- Rate limiting ----------
+   Un token bucket por IP y tipo de operación, con ventana de 1 minuto.
+   Los límites son altos a propósito: en la planta todos los equipos
+   comparten la misma IP (NAT), y la app refresca el historial cada 5 s.
+   Se pueden bajar con variables de entorno: RATE_LECTURA, RATE_ESCRITURA,
+   RATE_IMAGENES (0 = sin límite). */
+const VENTANA_MS = 60000;
+const LIMITES_POR_DEFECTO = { lectura: 600, escritura: 120, imagenes: 900 };
+const golpes = new Map();   // "tipo|ip" -> { n, t0 }
+
+function limiteDe(env, tipo) {
+  const clave = { lectura: "RATE_LECTURA", escritura: "RATE_ESCRITURA", imagenes: "RATE_IMAGENES" }[tipo];
+  const crudo = Number(env[clave]);
+  return Number.isFinite(crudo) && crudo >= 0 ? crudo : LIMITES_POR_DEFECTO[tipo];
+}
+
+function demasiadas(env, request, tipo) {
+  const max = limiteDe(env, tipo);
+  if (!max) return false;                       // 0 = desactivado
+  const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "desconocida";
+  const clave = tipo + "|" + ip;
+  const ahora = Date.now();
+  let e = golpes.get(clave);
+  if (!e || ahora - e.t0 >= VENTANA_MS) { e = { n: 0, t0: ahora }; golpes.set(clave, e); }
+  e.n++;
+  /* Poda: si el mapa crece mucho (muchas IPs distintas) se limpian las
+     ventanas viejas para no quedarnos sin memoria. */
+  if (golpes.size > 4000) {
+    for (const [k, v] of golpes) if (ahora - v.t0 >= VENTANA_MS) golpes.delete(k);
+  }
+  return e.n > max;
 }
 
 /* ---------- R2 ---------- */
@@ -322,13 +392,14 @@ async function imagenesDeFila(env, id) {
 async function guardar(env, cors, datos) {
   const id = String(datos.id || "");
   if (!id) return texto("FALTA_ID", cors);
+  if (!idValido(id)) return texto("ID_INVALIDO", cors);
 
   const fila = {};
   COLUMNAS.forEach((c) => {
     const v = datos[c];
     fila[c] = v === undefined || v === null
       ? ""
-      : (typeof v === "object" ? JSON.stringify(v) : String(v));
+      : (typeof v === "object" ? JSON.stringify(v) : textoCorto(v, MAX_TEXTO));
   });
   fila.novedad = datos.novedad ? 1 : 0;
 
@@ -388,6 +459,7 @@ async function guardar(env, cors, datos) {
 async function borrar(env, cors, id) {
   const clave = String(id || "");
   if (!clave) return texto("FALTA_ID", cors);
+  if (!idValido(clave)) return texto("ID_INVALIDO", cors);
   await borrarPrefijo(env, "fotos/" + clave + "/");
   await borrarPrefijo(env, "firmas/" + clave + ".");
   await env.DB.prepare("DELETE FROM ots WHERE id = ?").bind(clave).run();
@@ -500,14 +572,29 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors });
     }
+    /* Escudo anti-saturación antes de tocar auth o base. */
     try {
       const url = new URL(request.url);
+
+      /* Rate limiting antes de gastar trabajo: nadie llega a tocar la
+         base ni el bucket si viene disparando pedidos. */
+      if (request.method === "GET") {
+        const tipo = url.searchParams.get("img") !== null ? "imagenes" : "lectura";
+        if (demasiadas(env, request, tipo)) {
+          return respuesta(429, cors, { ok: false, error: "Demasiadas consultas. Probá en un momento." }, { "Retry-After": "60" });
+        }
+      } else if (request.method === "POST" && demasiadas(env, request, "escritura")) {
+        return respuesta(429, cors, { ok: false, error: "Demasiados envíos seguidos. Probá en un momento." }, { "Retry-After": "60" });
+      }
 
       if (request.method === "GET") {
         const auth = await autorizar(request, env, cors);
         if (auth.error) return auth.error;
         const img = url.searchParams.get("img");
-        if (img) return await imagen(env, cors, img);
+        if (img !== null) {
+          if (!claveValida(img)) return respuesta(400, cors, { ok: false, error: "Clave de imagen inválida" });
+          return await imagen(env, cors, img);
+        }
         if (url.searchParams.get("lineas") !== null) return await listarLineas(env, cors);
         if (url.searchParams.get("usuarios") !== null) return await listarUsuarios(env, cors, auth.user);
         if (url.searchParams.get("yo") !== null) return json(auth.user, cors);
@@ -515,7 +602,21 @@ export default {
       }
 
       if (request.method === "POST") {
-        const cuerpo = await request.json().catch(() => ({}));
+        /* Tope del cuerpo: una OT con 9 fotos ronda 12 MB; 25 MB deja
+           margen de sobra y corta los envíos gigantes que lastimarían
+           la memoria y la facturación. */
+        const declarado = Number(request.headers.get("Content-Length") || 0);
+        if (declarado > MAX_CUERPO) {
+          return respuesta(413, cors, { ok: false, error: "Envío demasiado grande (máximo 25 MB)" }, { "Retry-After": "30" });
+        }
+        /* (la variable se llama "crudo" y no "texto" para no tapar la
+           función texto() de este módulo) */
+        const crudo = await request.text();
+        if (crudo.length > MAX_CUERPO) {
+          return respuesta(413, cors, { ok: false, error: "Envío demasiado grande (máximo 25 MB)" }, { "Retry-After": "30" });
+        }
+        let cuerpo = {};
+        try { cuerpo = JSON.parse(crudo || "{}"); } catch (e) { cuerpo = {}; }
         if (cuerpo && cuerpo.action === "delete") {
           const auth = await autorizarEscritura(request, env, cors);
           if (auth.error) return auth.error;
@@ -543,6 +644,7 @@ export default {
         }
         const auth = await autorizarEscritura(request, env, cors);
         if (auth.error) return auth.error;
+        if (cuerpo && cuerpo.id && !idValido(cuerpo.id)) return texto("ID_INVALIDO", cors);
         return await guardar(env, cors, cuerpo);
       }
 

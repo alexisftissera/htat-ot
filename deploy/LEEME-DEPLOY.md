@@ -212,6 +212,44 @@ Prueba rápida:
 node --test tests\api.test.mjs tests\auth-core.test.mjs
 ```
 
+---
+
+# v6 · Endurecimiento de la API
+
+Qué se agregó y por qué (todo verificado con tests):
+
+| Escudo | Qué hace | Dónde se ajusta |
+|---|---|---|
+| **Rate limiting** | Corta con `429` + `Retry-After` si una misma IP se pasa: 120 escrituras/min, 600 lecturas/min, 900 imágenes/min. | `RATE_LECTURA`, `RATE_ESCRITURA`, `RATE_IMAGENES` (0 = sin límite) |
+| **Techo del POST** | Rechaza con `413` los envíos de más de 25 MB (una OT con 9 fotos ronda 12 MB). | `MAX_CUERPO` en el Worker |
+| **id con formato** | El id de la OT solo admite letras, números, guion y guion bajo: impide que un id con `..` o `/` llegue a formar claves del bucket (o que un editor borre fotos ajenas). | `idValido()` |
+| **Claves de imagen** | `GET /?img=` solo acepta `fotos/<id>/<n>.<ext>` y `firmas/<id>.<ext>`; cualquier otra cosa es `400`. | `claveValida()` |
+| **Texto acotado** | Cada campo de texto se recorta a 4000 caracteres: nadie mete megabytes por fila. | `MAX_TEXTO` |
+| **Cabeceras** | Toda respuesta lleva `X-Content-Type-Options: nosniff` y `Referrer-Policy: no-referrer`. | `CABECERAS_SEG` |
+
+> El rate limiting es **por instancia** (memoria del isolate): frena abuso
+> casual y ráfagas, no es un WAF. Si alguna vez hace falta un límite global,
+> va por KV o Durable Objects.
+
+## Qué NO hay en GitHub
+
+Revisado el repo completo y todos los commits: **no hay secretos**. Ningún
+`.env`, ninguna clave privada, ningún token de API. Lo único público por
+diseño es el **Client ID de Google**, que no es un secreto (va también en el
+navegador).
+
+Ojo: el repo es **público**, así que cualquiera puede leer el código del Worker
+(`htat_api_worker.js`) y el `wrangler.toml`. Está bien siempre que las
+**variables y secretos no estén en el repo**: viven en el panel de Cloudflare
+(`GOOGLE_CLIENT_ID` y `HTAT_ADMIN` como *secrets*).
+
+## Lo que sigue siendo una decisión del proyecto
+
+Cualquier cuenta de Google válida puede **leer** todo el historial (fotos y
+firmas incluidas): es el modelo "lectura abierta" elegido a propósito. Si algún
+día se quiere cerrar, la lista de permitidos ya está implementada para la
+escritura y alcanza con aplicarla también a la lectura, en `autorizar()`.
+
 ## Tests
 
 Suite con `node --test` (Node ≥ 18). Cubre el núcleo JWT y el contrato de

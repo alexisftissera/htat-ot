@@ -129,6 +129,11 @@ function entorno({ admin = "alexistissera1@gmail.com", perfiles = {}, editor = f
     HTAT_ADMIN: admin,
     DB: db,
     BUCKET: bucketDePrueba(),
+    /* Por defecto el rate limiting queda apagado en los tests: los casos
+       que lo prueban fijan su propio límite (ver "rate limiting:"). */
+    RATE_LECTURA: 0,
+    RATE_ESCRITURA: 0,
+    RATE_IMAGENES: 0,
     __verificarGoogle: async (token) => perfiles[token] || null,
   };
 }
@@ -261,12 +266,98 @@ test("GET /?lineas=1 es accesible para un lector", async () => {
   assert.ok(Array.isArray(lista));
 });
 
-test("GET /?img=clave-inexistente devuelve ok:false para un lector", async () => {
+test("GET /?img con una clave con formato válido pero inexistente responde ok:false", async () => {
   const env = entorno({ perfiles: PERFILES });
-  const r = await worker.fetch(peticion("/?img=no-existe.png", { token: "token-lector" }), env);
+  const r = await worker.fetch(peticion("/?img=fotos/ot-9/1.jpg", { token: "token-lector" }), env);
   assert.equal(r.status, 200);
   const c = await cuerpo(r);
   assert.equal(c.ok, false);
+});
+
+/* ================================================================
+   Seguridad: escudo anti-saturación, tamaño del envío, formatos
+   ================================================================ */
+test("rate limiting: al pasarse del límite responde 429 con Retry-After", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  env.RATE_ESCRITURA = 2;                     // límite bajo solo para este caso
+  const ip = "10.0.0.99";                    // IP propia: no ensucia el cubo de los demás
+  const ipOpciones = { "CF-Connecting-IP": ip };
+  const r1 = await worker.fetch(peticion("/", { token: "token-editor", headers: ipOpciones, body: { ...OT_BASE, id: "ot-l1" } }), env);
+  assert.equal(await r1.text(), "OK");
+  const r2 = await worker.fetch(peticion("/", { token: "token-editor", headers: ipOpciones, body: { ...OT_BASE, id: "ot-l2" } }), env);
+  assert.equal(await r2.text(), "OK");
+  const r3 = await worker.fetch(peticion("/", { token: "token-editor", headers: ipOpciones, body: { ...OT_BASE, id: "ot-l3" } }), env);
+  assert.equal(r3.status, 429);
+  assert.equal(r3.headers.get("Retry-After"), "60");
+  const c = await cuerpo(r3);
+  assert.equal(c.ok, false);
+});
+
+test("rate limiting: un límite en 0 lo desactiva", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  env.RATE_ESCRITURA = 0;
+  const ip = "10.0.0.98";
+  for (let i = 0; i < 5; i++) {
+    const r = await worker.fetch(peticion("/", {
+      token: "token-editor",
+      headers: { "CF-Connecting-IP": ip },
+      body: { ...OT_BASE, id: "ot-libre-" + i },
+    }), env);
+    assert.equal(await r.text(), "OK", "con límite 0 nunca debe cortar");
+  }
+});
+
+test("POST gigante (Content-Length) se rechaza con 413 sin tocar la base", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  const r = await worker.fetch(peticion("/", {
+    token: "token-editor",
+    headers: { "Content-Length": String(30 * 1024 * 1024) },
+    body: { ...OT_BASE },
+  }), env);
+  assert.equal(r.status, 413);
+  assert.equal(env.DB.ots.size, 0, "no debe guardar nada");
+});
+
+test("id de OT con caracteres raros se rechaza (no llega a formar claves del bucket)", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  for (const id of ["../../secreto", "ot 1", "ot/1", "a".repeat(65), ""]) {
+    const r = await worker.fetch(peticion("/", { token: "token-editor", body: { ...OT_BASE, id } }), env);
+    const t = await r.text();
+    assert.ok(t === "ID_INVALIDO" || t === "FALTA_ID", `id "${id}" deberia rechazarse, vino: ${t}`);
+  }
+  assert.equal(env.DB.ots.size, 0, "no se guardo ninguna OT");
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key);
+  assert.equal(claves.length, 0, "no se escribio nada en el bucket");
+});
+
+test("DELETE con id raro no borra nada", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, id: "ot-ok", fotos: ["data:image/jpeg;base64," + Buffer.from("x").toString("base64")] },
+  }), env);
+  const r = await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { action: "delete", id: "../ot-ok" },
+  }), env);
+  assert.equal(await r.text(), "ID_INVALIDO");
+  assert.ok(env.DB.ots.has("ot-ok"), "la OT buena sigue viva");
+});
+
+test("GET /?img con clave fuera de formato se rechaza con 400", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  for (const clave of ["../../ot-ok/1.jpg", "ot-ok/1.jpg", "fotos/ot-ok/99.jpg", "otales/cosas.jpg"]) {
+    const r = await worker.fetch(peticion("/?img=" + encodeURIComponent(clave), { token: "token-lector" }), env);
+    assert.equal(r.status, 400, `clave "${clave}" deberia dar 400`);
+  }
+});
+
+test("texto demasiado largo se recorta al guardar", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  const gigante = "A".repeat(20000);
+  await worker.fetch(peticion("/", { token: "token-editor", body: { ...OT_BASE, observaciones: gigante } }), env);
+  const fila = env.DB.ots.get("ot-1");
+  assert.ok(fila.observaciones.length <= 4000, "se recorta: " + fila.observaciones.length);
 });
 
 /* ============================================================
@@ -317,6 +408,32 @@ test("POST guardar OT con autor lo conserva y aparece en GET /", async () => {
   assert.ok(ot, "la OT guardada aparece en la lista");
   assert.equal(ot.autor, "hector@ejemplo.com");
   assert.equal(ot.editadoPor, "hector@ejemplo.com");
+});
+
+test("POST masivo activa el límite 429 y avisa cuándo reintentar", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  env.RATE_ESCRITURA = 3;                   // mismo mecanismo, con un tope chico para ir rápido
+  const ip = { "CF-Connecting-IP": "10.0.0.77" };
+  const estados = [];
+  for (let i = 0; i < 5; i++) {
+    const r = await worker.fetch(peticion("/", { token: "token-editor", headers: ip, body: { ...OT_BASE, id: "ot-rl-" + i } }), env);
+    estados.push(r.status);
+    await r.text();
+  }
+  assert.deepEqual(estados, [200, 200, 200, 429, 429], "corta a partir del 4to envío");
+  const extra = await worker.fetch(peticion("/", { token: "token-editor", headers: ip, body: { ...OT_BASE, id: "ot-rl-x" } }), env);
+  assert.equal(extra.status, 429);
+  const detalle = await extra.json();
+  assert.equal(detalle.ok, false);
+  assert.ok(Number(extra.headers.get("Retry-After")) >= 1, "informa cuándo reintentar");
+});
+
+test("respuestas API traen cabeceras de seguridad", async () => {
+  const env = entorno({ perfiles: PERFILES });
+  const r = await worker.fetch(peticion("/?yo=1", { token: "token-lector" }), env);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("X-Content-Type-Options"), "nosniff");
+  assert.equal(r.headers.get("Referrer-Policy"), "no-referrer");
 });
 
 test("POST delete con editor elimina la OT", async () => {
