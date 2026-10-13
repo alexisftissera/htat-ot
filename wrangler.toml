@@ -1,0 +1,26 @@
+# ============================================================
+#   Worker de la API del historial compartido (htat-api)
+#   Cloudflare Worker + D1 (datos de las OTs) + R2 (fotos y firma)
+#
+#   Deploy:  wrangler deploy            (usa este archivo)
+#   Secretos (NO van acá, se cargan aparte):
+#     wrangler secret put GOOGLE_CLIENT_ID
+#     wrangler secret put HTAT_ADMIN
+#   Deploy con variables del panel:wrangler deploy --keep-vars
+#
+#   La app (htat-ot) es otro Worker y se despliega aparte con sus assets.
+# ============================================================
+name = "htat-api"
+main = "htat_api_worker.js"
+compatibility_date = "2024-11-01"
+
+# Base D1 con las OTs (tablas ots, lineas, usuarios)
+[[d1_databases]]
+binding = "DB"
+database_name = "htat"
+database_id = "693b78a8-fe39-4501-b005-fd5986f97432"
+
+# Bucket con las fotos y la imagen de la firma
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "htat-evidencias"

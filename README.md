@@ -43,6 +43,7 @@ tests/              Suite de tests (node --test)
 htat_api_worker.js  API del historial (Worker htat-api: D1 + R2)
 auth-core.mjs       Núcleo de autenticación (compartido Worker/tests)
 htat_api_schema.sql Esquema D1 para bases nuevas
+wrangler.toml       Config de deploy del Worker htat-api (bindings D1 + R2)
 deploy/             Migraciones D1 y guía de despliegue
 assets/             Íconos
 ```
