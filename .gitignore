@@ -1,0 +1,10 @@
+# Dependencias / build
+node_modules/
+
+# Cache y archivos temporales de wrangler (deploy del Worker htat-api)
+.wrangler/
+dist/
+
+# Sistema
+Thumbs.db
+.DS_Store
