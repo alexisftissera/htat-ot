@@ -126,6 +126,9 @@
   const state = {
     fotos: [],
     editId: null,
+    fotosAlCargar: 0,    // cuántas fotos traía la OT al abrirla
+    descargaImagenes: null,  // promesa de la descarga de fotos/firma en curso
+    firmaLista: null,    // promesa de pintado de la firma restaurada
     viewing: null,        // id de foto en preview
     editIndex: -1,
     sigPad: null,
@@ -498,6 +501,13 @@
       actualizadoEn: now,
       creadoEn: now,
     };
+    /* Si la OT tenía fotos al abrirla y ahora hay menos, la persona las
+       quitó: sólo entonces se avisa a la base para borrarlas. Si no hay
+       fotos porque este equipo todavía no las descargó, NO se avisa (se
+       conservan las que ya están guardadas). */
+    if (state.editId && state.fotos.length < state.fotosAlCargar) {
+      rec.quitarFotos = true;
+    }
     /* Quién la editó por última vez (en creación coincide con el autor). */
     const sesionActual = Auth.usuario();
     rec.editadoPor = (sesionActual && sesionActual.email) || "";
@@ -537,6 +547,7 @@
 
   /* ---------- Acción: PDF ---------- */
   els.btnDownloadPdf.addEventListener("click", async () => {
+    await esperarImagenes();
     const rec = collectRecord();
     if (!rec) return;
     const dup = await otRepetida(rec.ot, rec.id);
@@ -604,6 +615,7 @@
 
   /* ---------- Guardar sin descargar (queda registrado en el historial) ---------- */
   els.btnSave.addEventListener("click", async () => {
+    await esperarImagenes();
     const rec = collectRecord();
     if (!rec) return;
     const dup = await otRepetida(rec.ot, rec.id);
@@ -637,6 +649,9 @@
     actualizarTareasPredictivo();
     state.fotos = [];
     state.editId = null;
+    state.fotosAlCargar = 0;
+    state.descargaImagenes = null;
+    state.firmaLista = null;
     state.sigPad.clear();
     renderPhotos();
     els.fFecha.value = Fmt.todayISO();
@@ -1282,12 +1297,23 @@
       }
       const acts = document.createElement("div");
       acts.className = "history-item-actions";
+      /* El PDF sale con fotos y firma: si la OT vino del historial
+         compartido hay que bajar antes las imágenes del bucket. */
+      const conImagenes = async () => {
+        const faltan = (r.fotos || []).some((f) => f && f.fileId && !f.dataUrl) ||
+          !!(r.firma && r.firma.fileId && !r.firma.dataUrl);
+        if (!faltan) return;
+        toast("Descargando fotos y firma…");
+        await Cloud.imagenesDe(r);
+      };
       const bPdf = mkActBtn("Descargar PDF", async () => {
+        await conImagenes();
         const doc = await HTAT_PDF.build(r);
         doc.save(fileNameFor(r));
         toast("PDF descargado", "ok");
       });
       const bView = mkActBtn("Mostrar PDF", async () => {
+        await conImagenes();
         const doc = await HTAT_PDF.build(r);
         const url = doc.output("bloburl");
         window.open(url, "_blank");
@@ -1360,27 +1386,58 @@
     actualizarTareasPredictivo();
     state.fotos = (r.fotos || []).slice();
     state.editId = r.id;
+    /* Cuántas fotos traía la OT: si al guardarla quedan menos, la
+       persona las quitó a propósito y eso hay que reflejar en la base. */
+    state.fotosAlCargar = state.fotos.length;
+    state.descargaImagenes = null;
+    state.firmaLista = null;
     renderPhotos();
-    if (r.firma && r.firma.dataUrl) state.sigPad.restore(r.firma.dataUrl);
+    /* Si la OT no tiene firma guardada el panel queda limpio: nunca debe
+       quedar en el canvas la firma de otra OT. */
+    if (r.firma && r.firma.dataUrl) state.firmaLista = state.sigPad.restore(r.firma.dataUrl);
+    else state.sigPad.clear();
     els.fFirmaFecha.value = Fmt.todayISO();
     registrarMaquina(r.activo, r.linea);
     els.form.scrollIntoView();
 
     /* Las OT del historial compartido traen solo la referencia a las
-       imágenes (bucket): se descargan por detrás y se muestran. */
+       imágenes (bucket): se descargan por detrás y se muestran. Guardar
+       espera a esta descarga: si se subiera antes, la OT viajaría a la
+       base sin las fotos. */
     const faltanImg = (r.fotos || []).some((f) => f && f.fileId && !f.dataUrl) ||
       !!(r.firma && r.firma.fileId && !r.firma.dataUrl);
     if (faltanImg) {
       toast("Descargando fotos y firma del historial…");
-      Cloud.imagenesDe(r)
+      state.descargaImagenes = Cloud.imagenesDe(r)
         .then(() => {
           if (state.editId !== r.id) return;   // cambió de OT mientras bajaba
           renderPhotos();
-          if (r.firma && r.firma.dataUrl) state.sigPad.restore(r.firma.dataUrl);
+          if (r.firma && r.firma.dataUrl) state.firmaLista = state.sigPad.restore(r.firma.dataUrl);
+          if (r.imagenesListas === false) {
+            toast("No se pudieron bajar todas las imágenes: se conservarán las que ya están en la base.", "err");
+          }
         })
-        .catch((e) => console.warn("htat: no se pudieron bajar las imágenes", e));
+        .catch((e) => {
+          console.warn("htat: no se pudieron bajar las imágenes", e);
+          if (state.editId === r.id) {
+            toast("No se pudieron bajar las imágenes: se conservarán las que ya están en la base.", "err");
+          }
+        });
     }
     toast("OT " + r.ot + " cargada para edición");
+  }
+
+  /* Espera a que terminen de bajar las fotos y la firma de la OT recién
+     cargada (si hay alguna descarga en curso) antes de guardar o generar
+     el PDF: si se subiera a mitad de camino, la base se quedaría sin las
+     imágenes o con el panel de firma todavía vacío. */
+  async function esperarImagenes() {
+    if (state.descargaImagenes) {
+      try { await state.descargaImagenes; } catch (e) { /* ya se avisó */ }
+    }
+    if (state.firmaLista) {
+      try { await state.firmaLista; } catch (e) { /* ya se avisó */ }
+    }
   }
 
   /* ---------- Configuración ---------- */

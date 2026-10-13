@@ -119,42 +119,66 @@ const Cloud = (() => {
     if (!isConfigured()) return false;
     const meta = toMeta(rec);
     /* Las imágenes viajan aparte: la base guarda solo la referencia.
-       Si alguna foto no se pudo descargar (p. ej. sin conexión), NO se
-       envían las imágenes para no borrar las que ya están guardadas. */
+       Importante distinguir tres casos:
+         - llegaron todas      -> se envían y reemplazan a las guardadas.
+         - faltan algunas     -> no se envía ninguna y se pide conservarlas
+                                  (p. ej. se guardó sin conexión).
+         - la lista está vacía -> puede ser que la OT no tenga fotos o que
+                                  este equipo todavía no las descargó. En
+                                  ese caso NO se manda "sin fotos" porque la
+                                  base lo interpretaría como borrarlas; sólo
+                                  se pide borrarlas si la persona las quitó
+                                  a propósito (rec.quitarFotos). */
     const fotos = Array.isArray(rec.fotos) ? rec.fotos : [];
-    const todasListas = fotos.every((f) => (typeof f === "string" ? true : !!(f && f.dataUrl)));
+    const dataUrls = fotos.map((f) => (typeof f === "string" ? f : (f && f.dataUrl) || "")).filter((s) => !!s);
+    const todasListas = dataUrls.length === fotos.length;
     const carga = {
       ...meta,
       firmaDataUrl: (rec.firma && rec.firma.dataUrl) || "",
     };
     if (todasListas) {
-      carga.fotos = fotos
-        .map((f) => (typeof f === "string" ? f : (f && f.dataUrl) || ""))
-        .filter((s) => !!s);
+      if (dataUrls.length) carga.fotos = dataUrls;
+      if (rec.quitarFotos) carga.borrarFotos = true;
     } else {
       carga.conservarImagenes = true;
     }
-    let txt;
+    let res, txt;
     try {
-      const res = await api("/", {
+      res = await api("/", {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(carga),
       });
-      txt = await res.text();
+      txt = (await res.text()).trim();
     } catch (e) {
       throw new Error("No se pudo contactar la base: " + e.message);
     }
-    if (txt === "OK" || txt.includes('"ok"')) {
+    /* Un "ok":false (sin permiso, error del servidor, sesión vencida) NO
+       es un guardado: si se tomara por bueno, la OT quedaría marcada como
+       compartida sin haber subido nunca. */
+    const ok = res.ok && (txt === "OK" || txt === '{"ok":true}');
+    if (ok) {
       lastOk = Date.now();
       if (Array.isArray(cache)) {
         const i = cache.findIndex((x) => x && x.id === meta.id);
-        if (i >= 0) cache[i] = meta; else cache.push(meta);
+        /* Se conserva la referencia a las imágenes que ya estaban en la
+           base: si se guardara solo el metadato, el historial mostraría
+           esta OT sin fotos ni firma hasta el próximo refresco. */
+        const previo = i >= 0 ? cache[i] : null;
+        const fila = Object.assign({}, meta);
+        if (previo) {
+          for (let n = 1; n <= CONF.limits.maxFotos; n++) {
+            const k = "foto" + n;
+            if (previo[k]) fila[k] = previo[k];
+          }
+          if (previo.firmaImg) fila.firmaImg = previo.firmaImg;
+        }
+        if (i >= 0) cache[i] = fila; else cache.push(fila);
         cacheAt = Date.now();
       }
       return true;
     }
-    throw new Error("La base no confirmó el guardado. Respuesta: " + txt.slice(0, 100));
+    throw new Error("La base no confirmó el guardado (HTTP " + res.status + "). Respuesta: " + txt.slice(0, 140));
   }
 
   async function del(id) {
@@ -347,7 +371,8 @@ const Cloud = (() => {
   }
 
   /* Completa en memoria los dataURL de las fotos y la firma de una OT
-     del historial compartido (los bytes no viajan con el listado). */
+     del historial compartido (los bytes no viajan con el listado).
+     Deja rec.imagenesListas=false si alguna no se pudo bajar. */
   async function imagenesDe(rec) {
     if (!rec) return rec;
     const fotos = rec.fotos || [];
@@ -357,8 +382,17 @@ const Cloud = (() => {
       ids.map((id) => (id ? imagenUrlDe(id) : Promise.resolve("")))
         .concat([firmaId ? imagenUrlDe(firmaId) : Promise.resolve("")])
     );
-    fotos.forEach((f, i) => { if (ids[i]) f.dataUrl = bajadas[i] || ""; });
-    if (rec.firma && firmaId) rec.firma.dataUrl = bajadas[ids.length] || "";
+    let faltan = 0;
+    fotos.forEach((f, i) => {
+      if (!ids[i]) return;
+      f.dataUrl = bajadas[i] || "";
+      if (!f.dataUrl) faltan++;
+    });
+    if (rec.firma && firmaId) {
+      rec.firma.dataUrl = bajadas[ids.length] || "";
+      if (!rec.firma.dataUrl) faltan++;
+    }
+    rec.imagenesListas = faltan === 0;
     return rec;
   }
 

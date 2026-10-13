@@ -42,6 +42,11 @@
    Para bases existentes correr antes la migración correspondiente;
    para bases nuevas el esquema htat_api_schema.sql ya incluye las 9
    columnas y la tabla usuarios.
+
+   EVIDENCIAS: un POST sin fotos ni firma NO borra lo que ya estaba
+   guardado (se conserva). Sólo se borran cuando el cliente manda
+   "borrarFotos": true, es decir, cuando la persona quitó las fotos a
+   propósito en el formulario.
    ============================================================ */
 
 import {
@@ -135,6 +140,17 @@ async function borrarPrefijo(env, prefijo) {
     const lista = await env.BUCKET.list({ prefix: prefijo, cursor });
     const claves = lista.objects.map((o) => o.key);
     if (claves.length) await env.BUCKET.delete(claves);
+    cursor = lista.truncated ? lista.cursor : undefined;
+  } while (cursor);
+}
+/* Borra del bucket SOLO las claves del prefijo que ya no están en uso
+   (las que quedaron al quitar una foto o al cambiar de extensión). */
+async function limpiarSobrantes(env, prefijo, enUso) {
+  let cursor;
+  do {
+    const lista = await env.BUCKET.list({ prefix: prefijo, cursor });
+    const sobrantes = lista.objects.map((o) => o.key).filter((k) => !enUso.has(k));
+    if (sobrantes.length) await env.BUCKET.delete(sobrantes);
     cursor = lista.truncated ? lista.cursor : undefined;
   } while (cursor);
 }
@@ -294,6 +310,15 @@ async function autorizarEscritura(request, env, cors) {
 }
 
 /* ---------- guardar / actualizar ---------- */
+/* Referencias de imágenes que la OT ya tiene guardadas (para conservarlas). */
+async function imagenesDeFila(env, id) {
+  const fila = await env.DB
+    .prepare("SELECT foto1,foto2,foto3,foto4,foto5,foto6,foto7,foto8,foto9,firmaImg FROM ots WHERE id = ?")
+    .bind(id)
+    .first();
+  return fila || null;
+}
+
 async function guardar(env, cors, datos) {
   const id = String(datos.id || "");
   if (!id) return texto("FALTA_ID", cors);
@@ -307,27 +332,44 @@ async function guardar(env, cors, datos) {
   });
   fila.novedad = datos.novedad ? 1 : 0;
 
-  if (datos.conservarImagenes) {
-    /* No llegaron las fotos (sin conexion): se conservan las que ya hay. */
-    const actual = await env.DB
-      .prepare("SELECT foto1,foto2,foto3,foto4,foto5,foto6,foto7,foto8,foto9,firmaImg FROM ots WHERE id = ?")
-      .bind(id)
-      .first();
-    for (let i = 1; i <= N_FOTOS; i++) fila["foto" + i] = actual ? actual["foto" + i] || "" : "";
-    fila.firmaImg = actual ? actual.firmaImg || "" : "";
-  } else {
-    await borrarPrefijo(env, "fotos/" + id + "/");
-    await borrarPrefijo(env, "firmas/" + id + ".");
-    const fotos = Array.isArray(datos.fotos) ? datos.fotos.slice(0, N_FOTOS) : [];
-    for (let i = 1; i <= N_FOTOS; i++) {
-      const dataUrl = fotos[i - 1];
-      const d = parseDataUrl(dataUrl);
-      const clave = "fotos/" + id + "/" + i + "." + extDe(d && d.mime);
-      fila["foto" + i] = dataUrl ? await guardarImagen(env, clave, dataUrl) : "";
+  /* EVIDENCIAS (fotos y firma): nunca se borran porque el pedido no las
+     trajo. Si el cliente no mandó imágenes —una OT cargada desde el
+     historial que todavía no las descargó, un guardado sin conexión, o
+     una app vieja— se conservan las que ya están en el bucket. Sólo se
+     borran cuando el cliente lo pide explícito (borrarFotos) o cuando la
+     OT es nueva. Antes, un guardado "sin fotos" vaciaba la OT entera. */
+  const actual = await imagenesDeFila(env, id);
+  const esNueva = !actual;
+  const enviarFotos = Array.isArray(datos.fotos) && !datos.conservarImagenes;
+  const borrarFotos = datos.borrarFotos === true || datos.borrarFotos === "true";
+  const fotosEnUso = new Set();
+
+  for (let i = 1; i <= N_FOTOS; i++) {
+    const dataUrl = enviarFotos ? datos.fotos[i - 1] : "";
+    const clave = "fotos/" + id + "/" + i + "." + extDe((parseDataUrl(dataUrl) || {}).mime);
+    const guardada = dataUrl ? await guardarImagen(env, clave, dataUrl) : "";
+    if (guardada) {
+      fila["foto" + i] = guardada;
+      fotosEnUso.add(guardada);
+      continue;
     }
-    const df = parseDataUrl(datos.firmaDataUrl);
-    const claveFirma = "firmas/" + id + "." + extDe(df && df.mime);
-    fila.firmaImg = datos.firmaDataUrl ? await guardarImagen(env, claveFirma, datos.firmaDataUrl) : "";
+    /* No llegó (o no se pudo leer) esta foto: se conserva la que hubiera. */
+    const previa = !borrarFotos && !esNueva ? (actual["foto" + i] || "") : "";
+    fila["foto" + i] = previa;
+    if (previa) fotosEnUso.add(previa);
+  }
+  await limpiarSobrantes(env, "fotos/" + id + "/", fotosEnUso);
+
+  const df = parseDataUrl(datos.firmaDataUrl);
+  const firmaNueva = datos.firmaDataUrl
+    ? await guardarImagen(env, "firmas/" + id + "." + extDe(df && df.mime), datos.firmaDataUrl)
+    : "";
+  if (firmaNueva) {
+    fila.firmaImg = firmaNueva;
+    await limpiarSobrantes(env, "firmas/" + id + ".", new Set([firmaNueva]));
+  } else {
+    /* Sin firma nueva se conserva la que ya estaba (nunca se pierde). */
+    fila.firmaImg = esNueva ? "" : (actual.firmaImg || "");
   }
 
   const columnas = COLUMNAS.join(", ");

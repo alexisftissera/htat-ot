@@ -473,3 +473,119 @@ test("guardar con foto y firma sube a R2 y el delete lo limpia", async () => {
   const restantes = (await env.BUCKET.list({})).objects.map((o) => o.key);
   assert.equal(restantes.length, 0, "delete limpia fotos y firma de R2");
 });
+
+/* ============================================================
+   Evidencias: un guardado sin fotos NO puede borrar las que ya hay
+   (regresión: cargar una OT de otro usuario y guardarla vaciaba el
+   bucket con las fotos y la firma).
+   ============================================================ */
+const FOTO = "data:image/jpeg;base64," + Buffer.from("foto-bytes").toString("base64");
+const FOTO2 = "data:image/jpeg;base64," + Buffer.from("foto2-bytes").toString("base64");
+const FIRMA = "data:image/png;base64," + Buffer.from("firma-bytes").toString("base64");
+
+async function otConEvidencias(env) {
+  await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, fotos: [FOTO, FOTO2], firmaDataUrl: FIRMA },
+  }), env);
+  return {
+    fila: env.DB.ots.get("ot-1"),
+    claves: (await env.BUCKET.list({})).objects.map((o) => o.key),
+  };
+}
+
+test("guardar sin fotos (listas vacías) conserva fotos y firma", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  const antes = await otConEvidencias(env);
+
+  /* Es lo que manda la app cuando la OT se cargó del historial y este
+     equipo todavía no tiene las imágenes descargadas. */
+  const r = await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, fotos: [], observaciones: "editada" },
+  }), env);
+  assert.equal(await r.text(), "OK");
+
+  const fila = env.DB.ots.get("ot-1");
+  assert.equal(fila.foto1, antes.fila.foto1, "foto1 conservada");
+  assert.equal(fila.foto2, antes.fila.foto2, "foto2 conservada");
+  assert.equal(fila.foto3, "", "no aparecieron fotos nuevas");
+  assert.equal(fila.firmaImg, antes.fila.firmaImg, "firma conservada");
+  assert.equal(fila.observaciones, "editada", "el resto de los datos sí se actualiza");
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key);
+  assert.deepEqual(claves.sort(), antes.claves.sort(), "R2 intacto");
+});
+
+test("guardar sin el campo fotos (app vieja) conserva las evidencias", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  const antes = await otConEvidencias(env);
+  await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, observaciones: "sin fotos" },
+  }), env);
+  const fila = env.DB.ots.get("ot-1");
+  assert.equal(fila.foto1, antes.fila.foto1);
+  assert.equal(fila.firmaImg, antes.fila.firmaImg);
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key);
+  assert.deepEqual(claves.sort(), antes.claves.sort());
+});
+
+test("borrarFotos quita de verdad las fotos de D1 y de R2", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  await otConEvidencias(env);
+  const r = await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, fotos: [], borrarFotos: true, firmaDataUrl: FIRMA },
+  }), env);
+  assert.equal(await r.text(), "OK");
+  const fila = env.DB.ots.get("ot-1");
+  assert.equal(fila.foto1, "");
+  assert.equal(fila.foto2, "");
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key);
+  assert.ok(!claves.some((k) => k.startsWith("fotos/ot-1/")), "las fotos salieron de R2");
+  assert.ok(claves.some((k) => k.startsWith("firmas/ot-1.")), "la firma sigue");
+});
+
+test("quitar una foto deja el resto y limpia la que sobra de R2", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  await otConEvidencias(env);
+  /* La app manda borrarFotos cuando en el formulario quedaron menos fotos
+     de las que traía la OT. */
+  const r = await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, fotos: [FOTO], borrarFotos: true, firmaDataUrl: FIRMA },
+  }), env);
+  assert.equal(await r.text(), "OK");
+  const fila = env.DB.ots.get("ot-1");
+  assert.equal(fila.foto1, "fotos/ot-1/1.jpg");
+  assert.equal(fila.foto2, "", "la segunda foto ya no está");
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key);
+  assert.ok(claves.includes("fotos/ot-1/1.jpg"));
+  assert.ok(!claves.includes("fotos/ot-1/2.jpg"), "R2 sin la foto quitada");
+});
+
+test("cambiar la extensión de una firma no deja el archivo viejo", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  await otConEvidencias(env);
+  const firmaJpg = "data:image/jpeg;base64," + Buffer.from("firma-jpg").toString("base64");
+  await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, firmaDataUrl: firmaJpg },
+  }), env);
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key).filter((k) => k.startsWith("firmas/"));
+  assert.deepEqual(claves, ["firmas/ot-1.jpg"]);
+  assert.equal(env.DB.ots.get("ot-1").firmaImg, "firmas/ot-1.jpg");
+});
+
+test("una OT nueva sin fotos no deja restos", async () => {
+  const env = entorno({ perfiles: PERFILES, editor: true });
+  await worker.fetch(peticion("/", {
+    token: "token-editor",
+    body: { ...OT_BASE, fotos: [] },
+  }), env);
+  const fila = env.DB.ots.get("ot-1");
+  assert.equal(fila.foto1, "");
+  assert.equal(fila.firmaImg, "");
+  const claves = (await env.BUCKET.list({})).objects.map((o) => o.key);
+  assert.deepEqual(claves, []);
+});

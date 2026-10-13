@@ -167,22 +167,35 @@ class SignaturePad {
 
   isEmpty() { return this._isEmpty; }
 
+  /* Vuelve a dibujar una firma guardada. Devuelve una promesa que se
+     resuelve cuando la imagen ya está en el canvas: así, al guardar la
+     OT no hace falta esperar a que termine de pintarse. */
   restore(dataUrl) {
-    if (!dataUrl) { this.clear(); return; }
-    const img = new Image();
-    img.onload = () => {
-      const w = this.canvas.width, h = this.canvas.height;
-      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-      this.ctx.fillStyle = "#ffffff";
-      this.ctx.fillRect(0, 0, w, h);
-      // Dibujar cubriendo el área sin distorsión
-      const r = Math.min(w / img.naturalWidth, h / img.naturalHeight);
-      const dw = img.naturalWidth * r, dh = img.naturalHeight * r;
-      this.ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-      this._isEmpty = false;
-      this.canvas.dispatchEvent(new CustomEvent("sigrestore"));
-    };
-    img.src = dataUrl;
+    if (!dataUrl) { this.clear(); return Promise.resolve(); }
+    return new Promise((resolve) => {
+      const img = new Image();
+      const pintado = () => {
+        const w = this.canvas.width, h = this.canvas.height;
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.fillStyle = "#ffffff";
+        this.ctx.fillRect(0, 0, w, h);
+        // Dibujar cubriendo el área sin distorsión
+        const r = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        const dw = img.naturalWidth * r, dh = img.naturalHeight * r;
+        this.ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+        this._isEmpty = false;
+        this.canvas.dispatchEvent(new CustomEvent("sigrestore"));
+        resolve();
+      };
+      img.onload = pintado;
+      img.onerror = () => {
+        /* No se pudo leer la firma guardada: el panel queda limpio y
+           quien edita tiene que volver a firmar. */
+        this.clear();
+        resolve();
+      };
+      img.src = dataUrl;
+    });
   }
 
   toDataURL() {

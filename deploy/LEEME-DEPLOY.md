@@ -1,8 +1,9 @@
 # 🔧 Despliegue — app HTAT
 
 Guía de despliegue del repo. Contiene (1) el fix de fotos 5 → 9, (2) el login
-obligatorio con Google (v3) y (3) el modelo de permisos **lectura abierta /
-edición por lista** (v4).<br><br>
+obligatorio con Google (v3), (3) el modelo de permisos **lectura abierta /
+edición por lista** (v4) y (4) la protección de fotos y firma al reguardar una
+OT del historial (v5).<br><br>
 
 ## Archivos
 
@@ -170,6 +171,46 @@ wrangler secret put HTAT_ADMIN         # tu email de Google
 
 CORS permitido por defecto: `https://htat-ot.htat.workers.dev`,
 `http://localhost:8080` y `https://localhost:8080`.
+
+---
+
+# v5 · Evidencias (fotos y firma) que ya no se pierden
+
+**Qué pasaba:** al cargar una OT del historial compartido y volver a guardarla,
+si el equipo todavía no tenía las imágenes descargadas, el POST llegaba sin
+fotos. El Worker lo leía como "esta OT no tiene fotos" y **borraba de R2 y de D1
+las fotos y la firma que ya estaban guardadas**. Quedaban solo en el equipo de
+quien las había subido.
+
+**Cómo queda ahora:**
+
+| Situación | Qué hace la base |
+|---|---|
+| Llegan todas las fotos | Se reemplazan por las nuevas (sobran las que se quitaron) |
+| No llega ninguna (aún descargando / sin conexión) | **Se conservan** las que ya estaban |
+| `borrarFotos: true` (la persona quitó fotos en el formulario) | Ahí sí se borran |
+| Sin firma nueva | **Se conserva** la firma guardada |
+
+Además en la app:
+
+- Guardar o bajar el PDF **espera** a que terminen de descargar las imágenes de
+  la OT cargada.
+- Al abrir una OT sin firma, el panel de firma queda limpio (no queda la firma
+  de otra OT).
+- Un `{"ok":false}` (sin permiso, error del servidor) ya no se toma por un
+  guardado: la OT queda "pendiente de subir" en vez de fingir que subió.
+
+> ⚠️ **Para que el arreglo protectslas evidencias hay que republicar el Worker
+> `htat-api`** (Paso 3). La app publicada hoy manda el mismo contrato, así que
+> con el Worker nuevo alcanza: aunque el navegador no se actualice, ya no se
+> borra nada. Después de eso, subir `js/cloud.js`, `js/app.js` y `sw.js` del
+> frontend (Paso 4).
+
+Prueba rápida:
+
+```
+node --test tests\api.test.mjs tests\auth-core.test.mjs
+```
 
 ## Tests
 
