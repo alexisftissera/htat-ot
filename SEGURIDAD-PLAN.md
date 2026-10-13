@@ -52,7 +52,7 @@ actualizá **`js/cloud.js`**: todas las llamadas `fetch(...)` deben llevar
 **`credentials: "include"`** para que el navegador envíe la cookie de sesión de Access.
 
 Ya dejé hecho este cambio en la copia local:
-`C:\Users\Alex\Documents\Default Project\htat-ot\js\cloud.js`
+`C:\Users\Alex\Documents\portafolio\proyectos\htat-ot\js\cloud.js`
 
 Ejemplo del cambio (una de las 7 llamadas):
 ```js
