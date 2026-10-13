@@ -919,6 +919,52 @@ textarea { resize: vertical; min-height: 96px; }
 .login-nota { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
 .login-pie { font-size: 11px; color: var(--muted); opacity: .8; margin: 0; letter-spacing: .4px; text-transform: uppercase; }
 body.login-abierto { overflow: hidden; }
+/* ---------- Efectos de entrada estilo React Bits (solo login, CSS puro) ----------
+   Fondo aurora animado + título con brillo + entrada de tarjeta. */
+.login-screen { overflow: hidden; }
+.login-screen::before,
+.login-screen::after {
+  content: "";
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: .5;
+  pointer-events: none;
+}
+.login-screen::before {
+  left: -18vmax;
+  top: -20vmax;
+  background: radial-gradient(circle, rgba(242, 140, 40, .35), transparent 65%);
+  animation: aurora-a 14s ease-in-out infinite alternate;
+}
+.login-screen::after {
+  right: -20vmax;
+  bottom: -22vmax;
+  background: radial-gradient(circle, rgba(30, 120, 200, .30), transparent 65%);
+  animation: aurora-b 18s ease-in-out infinite alternate;
+}
+.login-screen:not([hidden]) .login-card { animation: login-in .45s ease both; position: relative; z-index: 1; }
+@keyframes aurora-a { to { transform: translate(9vmax, 7vmax) scale(1.15); } }
+@keyframes aurora-b { to { transform: translate(-8vmax, -6vmax) scale(1.1); } }
+@keyframes login-in { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .login-title {
+    background: linear-gradient(110deg, var(--navy) 42%, var(--accent-2) 50%, var(--navy) 58%);
+    background-size: 230% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: login-shine 5s ease-in-out infinite;
+  }
+  @keyframes login-shine { 0% { background-position: 115% 0; } 60%, 100% { background-position: -35% 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-screen::before, .login-screen::after,
+  .login-screen:not([hidden]) .login-card, .login-title { animation: none; }
+}
 
 /* Chip de sesión en el encabezado */
 .user-avatar {
