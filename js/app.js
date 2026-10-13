@@ -185,6 +185,56 @@
     btn.classList.toggle("busy", busy);
   }
 
+  /* ---------- Contadores animados (efecto tipo React Bits) ----------
+     Los números del pie, del historial y del resumen no aparecen de
+     golpe: cuentan hacia arriba cuando cambian, con un salto suave.
+     Se apaga solo si la persona pidió menos movimiento en el sistema.
+     Va con temporizadores y no con requestAnimationFrame: así también
+     cuenta bien en una pestaña en segundo plano o en equipos lentos. */
+  function menosMovimiento() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+  /* contarEn(el, n, sufijo): al terminar queda escrito "n + sufijo".
+     Sólo cuenta si el número realmente cambió (el historial se refresca
+     cada 5 s: si no, el número se movería todo el tiempo). */
+  function contarEn(el, n, sufijo) {
+    if (!el) return;
+    const destino = Math.max(0, Math.round(Number(n) || 0));
+    const cola = sufijo || "";
+    if (el._contadorTimer) { clearInterval(el._contadorTimer); el._contadorTimer = null; }
+    const desde = Number(el.dataset.contador || 0);
+    el.dataset.contador = String(destino);
+    if (desde === destino || menosMovimiento()) {
+      el.textContent = destino + cola;
+      return;
+    }
+    const DUR = 420;
+    const t0 = Date.now();
+    const escribir = (v) => { el.textContent = v + cola; };
+    const cuadro = () => {
+      const t = Math.min(1, (Date.now() - t0) / DUR);
+      const suave = 1 - Math.pow(1 - t, 3);           // salida suave
+      escribir(Math.round(desde + (destino - desde) * suave));
+      if (t >= 1) { clearInterval(el._contadorTimer); el._contadorTimer = null; }
+    };
+    el._contadorTimer = setInterval(cuadro, 16);
+    /* Red de seguridad: aunque el navegador pause los temporizadores,
+       el número termina mostrando el valor correcto. */
+    setTimeout(() => {
+      if (el._contadorTimer) { clearInterval(el._contadorTimer); el._contadorTimer = null; }
+      escribir(destino);
+    }, DUR + 250);
+    /* el pequeño salto del número al cambiar */
+    if (typeof el.animate === "function") {
+      try {
+        el.animate(
+          [{ transform: "scale(1.18)" }, { transform: "scale(1)" }],
+          { duration: DUR, easing: "cubic-bezier(.2,.8,.2,1)" }
+        );
+      } catch (e) { /* sin animaciones: el número igual cuenta */ }
+    }
+  }
+
   /* ---------- Serialización / populares ---------- */
   function serializeValues() {
     return {
@@ -1058,7 +1108,7 @@
       .sort((a, b) => (b.fechaEmision || b.creadoEn || "").localeCompare(a.fechaEmision || a.creadoEn || ""));
     els.novList.innerHTML = "";
     els.novEmpty.hidden = con.length > 0;
-    els.novCount.textContent = con.length;
+    contarEn(els.novCount, con.length);
     con.forEach((r) => {
       const item = document.createElement("div");
       item.className = "history-item has-novedad";
@@ -1194,7 +1244,7 @@
         ? "Sin OTs registradas todavía. Cuando se cargue la primera, aparecerá acá."
         : "No hay registros que coincidan con los filtros. Si está activado \"Solo hoy\", pruebe a desactivarlo o busque por máquina.";
     }
-    els.histCount.textContent = sorted.length;
+    contarEn(els.histCount, sorted.length);
     const conNovedad = sorted.filter((r) => r.novedad);
     const sinNovedad = sorted.filter((r) => !r.novedad);
     const grupo = (label, lista, clave) => {
@@ -1552,11 +1602,13 @@
     try { local = await DB.all(); } catch (e) { local = []; }
     const pend = local.filter((r) => r && r.id && r.sincronizado !== true).length;
     const fotos = local.reduce((n, r) => n + ((r.fotos || []).length), 0);
-    els.cfgInfoLocal.textContent = local.length + (local.length === 1 ? " OT" : " OTs");
-    els.cfgInfoPend.textContent = pend === 0
-      ? "Ninguna (todo subido)"
-      : pend + (pend === 1 ? " OT pendiente" : " OTs pendientes");
-    els.cfgInfoFotos.textContent = String(fotos);
+    contarEn(els.cfgInfoLocal, local.length, local.length === 1 ? " OT" : " OTs");
+    if (pend === 0) {
+      els.cfgInfoPend.textContent = "Ninguna (todo subido)";
+    } else {
+      contarEn(els.cfgInfoPend, pend, pend === 1 ? " OT pendiente" : " OTs pendientes");
+    }
+    contarEn(els.cfgInfoFotos, fotos);
 
     const t = (Cloud.lastSync && Cloud.lastSync()) || 0;
     els.cfgInfoSync.textContent = t ? Fmt.hora(new Date(t).toISOString()) : "—";
@@ -1565,7 +1617,7 @@
     try {
       const filas = await Cloud.pullAll(true);
       const n = Array.isArray(filas) ? filas.length : 0;
-      els.cfgInfoNube.textContent = n + (n === 1 ? " OT" : " OTs");
+      contarEn(els.cfgInfoNube, n, n === 1 ? " OT" : " OTs");
       const t2 = (Cloud.lastSync && Cloud.lastSync()) || 0;
       if (t2) els.cfgInfoSync.textContent = Fmt.hora(new Date(t2).toISOString());
     } catch (e) {
@@ -1867,7 +1919,7 @@
   async function refreshCount() {
     try {
       const items = await Cloud.mergedFast().catch(() => []);
-      els.footCount.textContent = String(items.length);
+      contarEn(els.footCount, items.length);
     } catch { els.footCount.textContent = "-"; }
   }
 

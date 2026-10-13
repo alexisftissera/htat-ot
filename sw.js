@@ -5,7 +5,7 @@
    ============================================================ */
 "use strict";
 
-const VERSION = "htat-sw-v47";
+const VERSION = "htat-sw-v48";
 const ASSETS = [
   "./",
   "./index.html",
