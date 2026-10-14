@@ -1,0 +1,69 @@
+=========================================================
+   HTAT · Cómo abrir la app en esta PC
+=========================================================
+
+La app NO es un programa para instalar: es una página web.
+Necesitás conexión a internet y una cuenta de Google.
+
+---------------------------------------------------------
+OPCIÓN 1 · La más fácil
+---------------------------------------------------------
+Doble clic en el archivo:
+
+    ABRIR HTAT.url
+
+Se abre el navegador con la app lista.
+(Sobre el archivo: botón derecho -> Propiedades ->
+ "Desbloquear" si Windows lo marca.)
+
+---------------------------------------------------------
+OPCIÓN 2 · Si el archivo anterior no hace nada
+---------------------------------------------------------
+Doble clic en:
+
+    abrir-htat.bat
+
+También abre el navegador con la app.
+
+---------------------------------------------------------
+OPCIÓN 3 · A mano
+---------------------------------------------------------
+1. Abrí Chrome, Edge o Firefox.
+2. Escribí en la barra de direcciones:
+
+       https://htat-ot.htat.workers.dev/
+
+3. Enter.
+
+---------------------------------------------------------
+PRIMER USO EN ESTA PC
+---------------------------------------------------------
+1. Va a pedir iniciar sesión con Google. Usá tu cuenta de
+   Google (la misma que usás en las otras PCs).
+
+2. Si tu cuenta todavía no tiene permiso para cargar OTs,
+   entra en modo SOLO LECTURA: vas a ver el historial pero
+   no el formulario. Para dar permiso, un administrador
+   tiene que agregar tu email desde Configuración ->
+   "Usuarios con permiso de edición".
+
+3. La primera vez tarda un poco: se instala como app
+   (PWA). Después podés usar el ícono que aparece en el
+   escritorio y funciona casi como un programa.
+
+---------------------------------------------------------
+COSAS A TENER EN CUENTA
+---------------------------------------------------------
+· Las OTs que cargues desde acá se ven en TODAS las PCs
+  (y en los celulares) que usen la app.
+
+· Las fotos y la firma se guardan en el servidor. Esta PC
+  no necesita guardar nada.
+
+· Si la PC queda sin internet, la app abre igual y guarda
+  lo que cargues; cuando vuelva la conexión se sube sola.
+
+· Podés dejarla abierta en una pestaña fija como cualquier
+  página.
+
+=========================================================
