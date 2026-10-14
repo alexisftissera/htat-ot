@@ -1,5 +1,9 @@
 # HTAT · Resumen del proyecto
 
+> ⚠️ **Este archivo quedó desactualizado** (dice "Sin login", y el login con
+> Google y los roles ya existen). Para retomar el trabajo usá
+> **[`LEEME-TRABAJO.md`](LEEME-TRABAJO.md)**, que es la guía vigente.
+
 App PWA para Órdenes de Trabajo de mantenimiento predictivo/preventivo de planta.
 Formulario en 7 secciones, fotos, firma digital, PDF, historial local + compartido.
 
