@@ -256,6 +256,19 @@
     </div>
   </div>
 
+  <!-- Visor del PDF generado (no usa ventanas emergentes: se muestra acá
+       mismo, así no lo bloquea el navegador) -->
+  <div class="modal-backdrop modal-full" id="modalPdf" hidden>
+    <div class="modal modal-wide modal-pdf">
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnPdfDescargar">Descargar</button>
+        <button type="button" class="btn btn-secondary" id="btnPdfClose">Cerrar</button>
+      </div>
+      <p class="hint pdf-pista">Si acá no se ve el PDF, usá <strong>Descargar</strong>: se abre con cualquier lector.</p>
+      <iframe id="pdfFrame" title="PDF de la OT"></iframe>
+    </div>
+  </div>
+
   <!-- Historial -->
   <div class="modal-backdrop modal-full" id="modalHistory" hidden>
     <div class="modal modal-wide">

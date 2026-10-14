@@ -966,6 +966,21 @@ body.login-abierto { overflow: hidden; }
   .login-screen:not([hidden]) .login-card, .login-title { animation: none; }
 }
 
+/* ---------- Visor de PDF dentro de la app ----------
+   Se muestra en un modal y no en una ventana nueva: abrir una pestaña
+   con el PDF lo terminaba bloqueando el navegador. */
+.modal-pdf { display: flex; flex-direction: column; height: 92vh; max-height: 92vh; padding: 12px; gap: 8px; }
+.modal-pdf .modal-actions { justify-content: flex-end; order: -1; }
+.pdf-pista { margin: 0; font-size: 11.5px; color: var(--muted); text-align: right; order: -1; }
+.modal-pdf iframe {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
 /* Chip de sesión en el encabezado */
 .user-avatar {
   width: 26px;

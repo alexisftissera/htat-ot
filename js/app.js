@@ -64,6 +64,10 @@
     previewImg: $("previewImg"),
     btnPreviewClose: $("btnPreviewClose"),
     btnPreviewDelete: $("btnPreviewDelete"),
+    modalPdf: $("modalPdf"),
+    pdfFrame: $("pdfFrame"),
+    btnPdfClose: $("btnPdfClose"),
+    btnPdfDescargar: $("btnPdfDescargar"),
     modalHistory: $("modalHistory"),
     histSearch: $("histSearch"),
     btnHistSearch: $("btnHistSearch"),
@@ -412,6 +416,27 @@
     renderPhotos();
   });
   els.modalPreview.addEventListener("click", (e) => { if (e.target === els.modalPreview) els.modalPreview.hidden = true; });
+
+/* ---------- Visor de PDF (modal, sin ventanas emergentes) ---------- */
+  let pdfDoc = null;          // documento jsPDF abierto, para descargarlo
+  let pdfUrl = "";           // URL del blob que se muestra en el <iframe>
+  function mostrarPdf(doc, nombreArchivo) {
+    pdfDoc = doc;
+    if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = ""; }
+    pdfUrl = doc.output("bloburl");
+    els.pdfFrame.src = pdfUrl;
+    els.btnPdfDescargar.onclick = () => { try { doc.save(nombreArchivo); } catch (e) { toast("No se pudo descargar.", "err"); } };
+    els.modalPdf.hidden = false;
+  }
+  function cerrarPdf() {
+    els.modalPdf.hidden = true;
+    els.pdfFrame.removeAttribute("src");
+    if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = ""; }
+    pdfDoc = null;
+  }
+  els.btnPdfClose.addEventListener("click", cerrarPdf);
+  els.modalPdf.addEventListener("click", (e) => { if (e.target === els.modalPdf) cerrarPdf(); });
+  window.addEventListener("beforeunload", () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); });
 
   els.btnCamara.addEventListener("click", () => els.fileCamara.click());
   els.btnGaleria.addEventListener("click", () => els.fileGaleria.click());
@@ -1362,12 +1387,19 @@
         doc.save(fileNameFor(r));
         toast("PDF descargado", "ok");
       });
+      /* "Mostrar PDF" abre el PDF dentro de la app, en un modal.
+         Antes usaba window.open() con un blob y casi nunca abría: el
+         navegador lo bloquea como ventana emergente (y en el celular
+         tampoco cargaba). Con un <iframe> no hay nada que bloquear. */
       const bView = mkActBtn("Mostrar PDF", async () => {
-        await conImagenes();
-        const doc = await HTAT_PDF.build(r);
-        const url = doc.output("bloburl");
-        window.open(url, "_blank");
-        toast("Mostrando PDF", "ok");
+        try {
+          await conImagenes();
+          const doc = await HTAT_PDF.build(r);
+          mostrarPdf(doc, fileNameFor(r));
+        } catch (e) {
+          console.error(e);
+          toast("No se pudo generar el PDF: " + (e.message || e), "err");
+        }
       });
       acts.append(bPdf, bView);
       if (Auth.esEditor()) {
@@ -1887,7 +1919,7 @@
      si no hay ninguna abierta, el siguiente "atrás" sale de la app. */
   function modalAbierto() {
     const visibles = [
-      els.modalHistory, els.modalConfig, els.modalInstall,
+      els.modalHistory, els.modalConfig, els.modalInstall, els.modalPdf,
       els.modalNovedades, els.modalMaquinas, els.modalResumen, els.modalPreview,
       els.modalPerfil, els.modalBienvenida,
     ];
@@ -1899,7 +1931,7 @@
     document.body.classList.toggle("modal-open", !!modalAbierto());
   }
   const observadorModales = new MutationObserver(actualizarBloqueoScroll);
-  [els.modalHistory, els.modalConfig, els.modalInstall, els.modalNovedades,
+  [els.modalHistory, els.modalConfig, els.modalInstall, els.modalPdf, els.modalNovedades,
     els.modalMaquinas, els.modalResumen, els.modalPreview, els.modalPerfil,
     els.modalBienvenida].forEach((m) => {
     if (m) observadorModales.observe(m, { attributes: true, attributeFilter: ["hidden"] });

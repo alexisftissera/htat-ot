@@ -263,7 +263,11 @@ const HTAT_PDF = (() => {
     y += obsH + 6;
 
     /* ---------- 5) Evidencia fotográfica ---------- */
-    const fotos = record.fotos || [];
+    /* Solo las fotos que están de verdad cargadas en memoria: una OT que
+       viene del historial puede traer la referencia pero no los bytes
+       (si no se bajaron, o si se guardó sin conexión). Antes eso rompía
+       el PDF entero con un error de jsPDF. */
+    const fotos = (record.fotos || []).filter((f) => f && f.dataUrl);
     y = sectionTitle(doc, y, "Evidencia Fotográfica");
     if (fotos.length) {
       const cw = (W - 6) / 2;
