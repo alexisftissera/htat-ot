@@ -479,6 +479,17 @@
   }
 
   /* ---------- Validación y recolección ---------- */
+  /* Acepta "12.5", "12,5", " 12,5 " y lo deja siempre con punto.
+     Devuelve null si el campo está vacío; null también si no es un
+     número (en ese caso el campo queda marcado como inválido). */
+  function normalizarNumero(v) {
+    const s = String(v == null ? "" : v).trim();
+    if (s === "") return null;
+    const conPunto = s.replace(",", ".");
+    if (!/^\d+(?:\.\d+)?$/.test(conPunto)) return NaN;
+    return conPunto;
+  }
+
   function validate() {
     const errs = [];
     const fields = [els.fOt, els.fFecha, els.fLinea, els.fActivo, els.fPlan, els.fFirmaNombre, els.fFirmaFecha];
@@ -507,6 +518,14 @@
       els.errActivo.textContent = "";
     }
     if (!els.fPlan.value) mark(els.fPlan, "Seleccione el tipo de plan.");
+
+    /* Amperes y presión: admiten punto o coma; si no es un número se avisa
+       y se deja el valor con punto para que quede prolijo en el campo. */
+    [els.fEnergia, els.fPresion].forEach((campo) => {
+      const v = normalizarNumero(campo.value);
+      if (Number.isNaN(v)) mark(campo, "Ingrese un número (por ejemplo 12.5).");
+      else campo.value = v === null ? "" : v;
+    });
 
     if (state.sigPad.isEmpty()) errs.push("Firme el trabajo en el panel de firma digital.");
     if (!els.fFirmaFecha.value) mark(els.fFirmaFecha, "Ingrese la fecha de la firma.");
@@ -542,7 +561,7 @@
   function collectRecord() {
     const res = validate();
     if (!res.ok) {
-      const first = [els.fOt, els.fFecha, els.fLinea, els.fActivo, els.fPlan, els.fFirmaNombre, els.fFirmaFecha].find(
+      const first = [els.fOt, els.fFecha, els.fLinea, els.fActivo, els.fPlan, els.fEnergia, els.fPresion, els.fFirmaNombre, els.fFirmaFecha].find(
         (el) => el.closest(".field") && el.closest(".field").classList.contains("invalid")
       );
       if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -550,9 +569,14 @@
       return null;
     }
     const now = new Date().toISOString();
+    /* Los campos de amperes y presión son de texto (no type=number) para que
+       se pueda escribir "12.5" o "12,5": con type=number el teclado del
+       celular a veces no muestra el separador y lo tecleado se descarta en
+       silencio. Acá se normaliza al punto antes de guardar. */
     const readMetric = (v, u) => {
-      if (v === "") return null;
-      return { valor: String(v), unidad: u };
+      const limpio = normalizarNumero(v);
+      if (limpio === null) return null;
+      return { valor: limpio, unidad: u };
     };
     const rec = {
       id: state.editId || StoreUtils.nextId(),
@@ -1387,17 +1411,43 @@
         doc.save(fileNameFor(r));
         toast("PDF descargado", "ok");
       });
-      /* "Mostrar PDF" abre el PDF dentro de la app, en un modal.
-         Antes usaba window.open() con un blob y casi nunca abría: el
-         navegador lo bloquea como ventana emergente (y en el celular
-         tampoco cargaba). Con un <iframe> no hay nada que bloquear. */
+      /* "Mostrar PDF": abre el PDF para VERLO, sin guardarlo.
+         1) Reserva la pestaña nueva en el mismo clic (si se espera a armar
+            el PDF, el navegador la bloquea como ventana emergente).
+         2) La pestaña muestra "Generando…" al instante y después el visor
+            nativo del navegador: se abre rápido y se ve bien en el celular.
+         3) Si esa pestaña no llegara a mostrar el PDF (o el navegador la
+            bloqueó), cae al modal de la app, que siempre funciona. */
       const bView = mkActBtn("Mostrar PDF", async () => {
+        let vent = null;
+        try { vent = window.open("", "_blank"); } catch (e) { vent = null; }
+        if (vent) {
+          try {
+            vent.document.write("<!doctype html><meta charset=utf-8><title>Generando el PDF…</title>" +
+              "<body style=\"font:16px system-ui;padding:2rem;color:#15243a\">Generando el PDF…</body>");
+            vent.document.close();
+          } catch (e) { /* da igual */ }
+        }
         try {
           await conImagenes();
           const doc = await HTAT_PDF.build(r);
-          mostrarPdf(doc, fileNameFor(r));
+          const archivo = fileNameFor(r);
+          const url = doc.output("bloburl");
+          if (!vent) { mostrarPdf(doc, archivo); return; }
+          vent.location.href = url;
+          /* Si a los 1,5 s la pestaña sigue en blanco, el visor no tomó la
+             URL: se cierra esa pestaña y se muestra en el modal. */
+          setTimeout(() => {
+            try {
+              if (String(vent.location.href).indexOf("blob:") !== 0) {
+                try { vent.close(); } catch (e) { /* nada */ }
+                mostrarPdf(doc, archivo);
+              }
+            } catch (e) { /* si no se puede leer, se asume que salió bien */ }
+          }, 1500);
         } catch (e) {
           console.error(e);
+          try { if (vent) vent.close(); } catch (e2) { /* nada */ }
           toast("No se pudo generar el PDF: " + (e.message || e), "err");
         }
       });

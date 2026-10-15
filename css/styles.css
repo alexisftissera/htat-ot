@@ -970,6 +970,7 @@ body.login-abierto { overflow: hidden; }
    Se muestra en un modal y no en una ventana nueva: abrir una pestaña
    con el PDF lo terminaba bloqueando el navegador. */
 .modal-pdf { display: flex; flex-direction: column; height: 92vh; max-height: 92vh; padding: 12px; gap: 8px; }
+@supports (height: 92dvh) { .modal-pdf { height: 92dvh; max-height: 92dvh; } }
 .modal-pdf .modal-actions { justify-content: flex-end; order: -1; }
 .pdf-pista { margin: 0; font-size: 11.5px; color: var(--muted); text-align: right; order: -1; }
 .modal-pdf iframe {
