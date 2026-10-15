@@ -1,5 +1,0 @@
-# App interna de Órdenes de Trabajo: el acceso es con Google y es de uso
-# interno para la planta. No debe aparecer en buscadores.
-# La web pública de la empresa es https://htat-soluciones.netlify.app
-User-agent: *
-Disallow: /

@@ -1,4 +1,0 @@
-# App interna con login de Google: los buscadores deben ignorarla.
-# La web publica de la empresa es https://htat-soluciones.netlify.app
-/*
-  X-Robots-Tag: noindex, nofollow
